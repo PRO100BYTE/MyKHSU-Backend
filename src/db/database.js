@@ -77,6 +77,10 @@ function initUsersSchema(db) {
       password   TEXT NOT NULL,
       is_active  INTEGER NOT NULL DEFAULT 1,
       role       TEXT NOT NULL DEFAULT 'admin',
+      first_name TEXT,
+      last_name  TEXT,
+      position   TEXT,
+      email      TEXT,
       created_at TEXT,
       updated_at TEXT
     );
@@ -86,6 +90,16 @@ function initUsersSchema(db) {
       subject          TEXT    NOT NULL,
       contact_email    TEXT,
       contact_name     TEXT,
+      encrypted_subject_iv   TEXT,
+      encrypted_subject_tag  TEXT,
+      encrypted_subject_data TEXT,
+      encrypted_contact_email_iv   TEXT,
+      encrypted_contact_email_tag  TEXT,
+      encrypted_contact_email_data TEXT,
+      encrypted_contact_name_iv   TEXT,
+      encrypted_contact_name_tag  TEXT,
+      encrypted_contact_name_data TEXT,
+      contact_email_hash TEXT,
       status           TEXT    NOT NULL DEFAULT 'open',
       priority         TEXT    NOT NULL DEFAULT 'normal',
       access_token     TEXT    UNIQUE,
@@ -133,6 +147,7 @@ function initUsersSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_status       ON unified_window_tickets(status);
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_priority     ON unified_window_tickets(priority);
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_access_token ON unified_window_tickets(access_token);
+    CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash);
     CREATE INDEX IF NOT EXISTS idx_uw_messages_ticket_id   ON unified_window_messages(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_uw_files_ticket_id      ON unified_window_files(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_uw_history_ticket_id    ON unified_window_status_history(ticket_id);
@@ -152,6 +167,51 @@ function initUsersSchema(db) {
   if (!columns.includes('role')) {
     db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
   }
+  if (!columns.includes('first_name')) {
+    db.exec('ALTER TABLE users ADD COLUMN first_name TEXT');
+  }
+  if (!columns.includes('last_name')) {
+    db.exec('ALTER TABLE users ADD COLUMN last_name TEXT');
+  }
+  if (!columns.includes('position')) {
+    db.exec('ALTER TABLE users ADD COLUMN position TEXT');
+  }
+  if (!columns.includes('email')) {
+    db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+  }
+
+  const uwColumns = db.prepare('PRAGMA table_info(unified_window_tickets)').all().map(c => c.name);
+  if (!uwColumns.includes('encrypted_subject_iv')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_subject_iv TEXT');
+  }
+  if (!uwColumns.includes('encrypted_subject_tag')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_subject_tag TEXT');
+  }
+  if (!uwColumns.includes('encrypted_subject_data')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_subject_data TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_email_iv')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_email_iv TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_email_tag')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_email_tag TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_email_data')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_email_data TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_name_iv')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_name_iv TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_name_tag')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_name_tag TEXT');
+  }
+  if (!uwColumns.includes('encrypted_contact_name_data')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN encrypted_contact_name_data TEXT');
+  }
+  if (!uwColumns.includes('contact_email_hash')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN contact_email_hash TEXT');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash)');
 
   const now = new Date().toISOString();
   db.prepare('UPDATE users SET created_at = COALESCE(created_at, ?), updated_at = COALESCE(updated_at, ?)').run(now, now);
