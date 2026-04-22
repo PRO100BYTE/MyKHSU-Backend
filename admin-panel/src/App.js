@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
@@ -39,6 +39,8 @@ export default function App() {
   const { showNavLabels, uiDensity } = useTheme();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 768);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
 
   // Auto-collapse sidebar on small screens
   useEffect(() => {
@@ -48,6 +50,21 @@ export default function App() {
   }, []);
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed(c => !c), []);
+
+  useEffect(() => {
+    const onDocumentClick = (event) => {
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onDocumentClick);
+    return () => document.removeEventListener('mousedown', onDocumentClick);
+  }, []);
+
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [location.pathname, sidebarCollapsed]);
 
   if (loading) {
     return (
@@ -81,9 +98,6 @@ export default function App() {
             <div className="sidebar__brand-title">{ADMIN_UI.brandTitle}</div>
             <div className="sidebar__brand-sub">{ADMIN_UI.brandSubTitle}</div>
           </div>
-          <button className="sidebar__collapse-btn" onClick={toggleSidebar} title={sidebarCollapsed ? 'Развернуть' : 'Свернуть'}>
-            <ion-icon name={sidebarCollapsed ? 'chevron-forward-outline' : 'chevron-back-outline'} />
-          </button>
         </div>
 
         <nav className="sidebar__nav">
@@ -101,8 +115,13 @@ export default function App() {
         </nav>
 
         <div className="sidebar__footer">
-          <div className="sidebar__user-menu">
-            <button className="sidebar__user-trigger" type="button">
+          <button className="sidebar__collapse-btn sidebar__collapse-btn--footer" onClick={toggleSidebar} title={sidebarCollapsed ? 'Развернуть' : 'Свернуть'}>
+            <ion-icon name={sidebarCollapsed ? 'chevron-forward-outline' : 'chevron-back-outline'} />
+            {!sidebarCollapsed && <span>Свернуть меню</span>}
+          </button>
+
+          <div className="sidebar__user-menu" ref={profileMenuRef}>
+            <button className="sidebar__user-trigger" type="button" onClick={() => setProfileMenuOpen(v => !v)}>
               <div className="sidebar__avatar">
                 {user.first_name ? user.first_name[0].toUpperCase() : user.username?.[0]?.toUpperCase() ?? 'A'}
               </div>
@@ -111,9 +130,9 @@ export default function App() {
                   {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
                 </div>
               )}
-              {!sidebarCollapsed && <ion-icon name="chevron-up-outline" />}
+              {!sidebarCollapsed && <ion-icon name={profileMenuOpen ? 'chevron-down-outline' : 'chevron-up-outline'} />}
             </button>
-            <div className="profile-menu">
+            <div className={`profile-menu${profileMenuOpen ? ' profile-menu--open' : ''}`}>
               <NavLink to="/profile" className="profile-menu__item">
                 <ion-icon name="person-outline" />
                 Профиль
@@ -134,9 +153,6 @@ export default function App() {
           <div className="admin-header__title-wrap">
             <div className="admin-header__eyebrow">Control Center</div>
             <div className="admin-header__title">{title}</div>
-          </div>
-          <div className="admin-header__actions">
-            <div className="admin-header__meta-chip">{ADMIN_UI.brandSubTitle}</div>
           </div>
         </header>
 
