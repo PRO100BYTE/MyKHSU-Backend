@@ -17,6 +17,29 @@ const ROLE_LABELS = {
   unified_window_agent: 'Агент единого окна',
 };
 
+const ROLE_PERMISSIONS = {
+  admin: {
+    desc: 'Полный доступ ко всем разделам и функциям системы.',
+    perms: ['Расписание (чтение/запись)', 'Звонки (чтение/запись)', 'Новости (чтение/запись)', 'Пользователи (управление)', 'Единое окно (все функции)', 'Внешний вид', 'Профиль'],
+  },
+  schedule_dispatcher: {
+    desc: 'Управление расписанием занятий и расписанием звонков.',
+    perms: ['Расписание (чтение/запись)', 'Звонки (чтение/запись)', 'Профиль'],
+  },
+  news_editor: {
+    desc: 'Создание и редактирование новостей.',
+    perms: ['Новости (чтение/запись)', 'Профиль'],
+  },
+  manager: {
+    desc: 'Просмотр расписания, новостей и единого окна без права изменений.',
+    perms: ['Расписание (чтение)', 'Новости (чтение)', 'Единое окно (чтение)', 'Профиль'],
+  },
+  unified_window_agent: {
+    desc: 'Работа с обращениями единого окна: ответы и смена статусов.',
+    perms: ['Единое окно (чтение/ответы/смена статуса)', 'Профиль'],
+  },
+};
+
 export default function UsersScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
@@ -299,6 +322,16 @@ export default function UsersScreen() {
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
+                {ROLE_PERMISSIONS[form.role] && (
+                  <div className="role-info-panel">
+                    <div className="role-info-panel__desc">{ROLE_PERMISSIONS[form.role].desc}</div>
+                    <ul className="role-info-panel__perms">
+                      {ROLE_PERMISSIONS[form.role].perms.map(p => (
+                        <li key={p}><ion-icon name="checkmark-outline" /> {p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="modal__footer">
