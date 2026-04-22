@@ -411,10 +411,32 @@ router.get('/unified-window/tickets/:token', (req, res) => {
     subject: ticket.subject,
     status: ticket.status,
     priority: ticket.priority,
+    contact_name: ticket.contact_name,
     due_at: ticket.due_at,
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
   })
+})
+
+// GET /api/unified-window/tickets/:token/messages — получить сообщения по токену
+router.get('/unified-window/tickets/:token/messages', (req, res) => {
+  const { token } = req.params
+  if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
+
+  const ticket = usersDb.prepare('SELECT id FROM unified_window_tickets WHERE access_token = ?').get(token)
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+
+  const messages = usersDb.prepare(
+    'SELECT id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at FROM unified_window_messages WHERE ticket_id = ? ORDER BY created_at'
+  ).all(ticket.id)
+
+  const result = messages.map(m => {
+    let text = ''
+    try { text = decryptText({ iv: m.encrypted_text_iv, tag: m.encrypted_text_tag, data: m.encrypted_text_data }) } catch { text = '' }
+    return { id: m.id, author_role: m.author_role, author_name: m.author_name, text, created_at: m.created_at }
+  })
+
+  res.json(result)
 })
 
 // POST /api/unified-window/tickets/:token/reply — пользователь добавляет сообщение
