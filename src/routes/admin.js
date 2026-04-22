@@ -66,6 +66,98 @@ router.post('/checktoken', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /adminapi/profile
+// ---------------------------------------------------------------------------
+router.get('/profile', requireAuth, (req, res) => {
+  const user = usersDb.prepare(
+    `SELECT id, username, first_name, last_name, position, email, is_active, created_at, updated_at
+     FROM users
+     WHERE id = ?`
+  ).get(req.user.uid);
+
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  res.json({
+    id: user.id,
+    username: user.username,
+    first_name: user.first_name ?? '',
+    last_name: user.last_name ?? '',
+    position: user.position ?? '',
+    email: user.email ?? '',
+    is_active: Boolean(user.is_active),
+    created_at: user.created_at ?? null,
+    updated_at: user.updated_at ?? null,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /adminapi/profile
+// Body: { username?, first_name?, last_name?, position?, email?, current_password?, new_password? }
+// ---------------------------------------------------------------------------
+router.patch('/profile', requireAuth, async (req, res) => {
+  const current = usersDb.prepare('SELECT * FROM users WHERE id = ?').get(req.user.uid);
+  if (!current) return res.status(404).json({ error: 'User not found' });
+
+  const updates = [];
+  const params = { id: req.user.uid, updatedAt: nowSql() };
+
+  if (req.body?.username !== undefined) {
+    const safeUsername = String(req.body.username ?? '').trim();
+    if (safeUsername.length < 3) {
+      return res.status(400).json({ error: 'username must be at least 3 characters' });
+    }
+    const conflict = usersDb.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(safeUsername, req.user.uid);
+    if (conflict) return res.status(409).json({ error: 'username already exists' });
+    updates.push('username = @username');
+    params.username = safeUsername;
+  }
+
+  for (const field of ['first_name', 'last_name', 'position']) {
+    if (req.body?.[field] !== undefined) {
+      updates.push(`${field} = @${field}`);
+      params[field] = String(req.body[field] ?? '').trim() || null;
+    }
+  }
+
+  if (req.body?.email !== undefined) {
+    const email = String(req.body.email ?? '').trim();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ error: 'email is invalid' });
+    }
+    updates.push('email = @email');
+    params.email = email || null;
+  }
+
+  if (req.body?.new_password !== undefined && req.body.new_password !== '') {
+    const currentPassword = String(req.body.current_password ?? '');
+    if (!currentPassword) {
+      return res.status(400).json({ error: 'current_password is required to change password' });
+    }
+    const valid = await argon2.verify(current.password, currentPassword);
+    if (!valid) {
+      return res.status(401).json({ error: 'current_password is invalid' });
+    }
+
+    const newPassword = String(req.body.new_password);
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'new_password must be at least 8 characters' });
+    }
+
+    updates.push('password = @password');
+    params.password = await argon2.hash(newPassword, { type: argon2.argon2id });
+  }
+
+  if (!updates.length) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  updates.push('updated_at = @updatedAt');
+  usersDb.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = @id`).run(params);
+
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
 // GET /adminapi/users
 // ---------------------------------------------------------------------------
 router.get('/users', requireAuth, (_req, res) => {
@@ -214,6 +306,55 @@ router.delete('/users/:id', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Catalog CRUD for manual schedule setup
+// ---------------------------------------------------------------------------
+router.get('/catalog/courses', requireAuth, (_req, res) => {
+  const rows = pairsDb.prepare('SELECT id, course, created_at FROM course_catalog ORDER BY course').all();
+  res.json(rows);
+});
+
+router.post('/catalog/courses', requireAuth, (req, res) => {
+  const course = Number.parseInt(req.body?.course, 10);
+  if (Number.isNaN(course)) {
+    return res.status(400).json({ error: 'course must be a number' });
+  }
+
+  const result = pairsDb.prepare(
+    'INSERT OR IGNORE INTO course_catalog (course, created_at) VALUES (?, ?)'
+  ).run(course, nowSql());
+
+  res.json({ ok: true, inserted: result.changes > 0 });
+});
+
+router.get('/catalog/groups', requireAuth, (req, res) => {
+  const course = req.query.course !== undefined ? Number.parseInt(req.query.course, 10) : null;
+  if (req.query.course !== undefined && Number.isNaN(course)) {
+    return res.status(400).json({ error: 'course must be a number' });
+  }
+
+  const rows = course === null
+    ? pairsDb.prepare('SELECT id, course, group_name, created_at FROM group_catalog ORDER BY course, group_name').all()
+    : pairsDb.prepare('SELECT id, course, group_name, created_at FROM group_catalog WHERE course = ? ORDER BY group_name').all(course);
+
+  res.json(rows);
+});
+
+router.post('/catalog/groups', requireAuth, (req, res) => {
+  const course = Number.parseInt(req.body?.course, 10);
+  const groupName = String(req.body?.group_name ?? '').trim();
+
+  if (Number.isNaN(course) || !groupName) {
+    return res.status(400).json({ error: 'course and group_name are required' });
+  }
+
+  const result = pairsDb.prepare(
+    'INSERT OR IGNORE INTO group_catalog (course, group_name, created_at) VALUES (?, ?, ?)'
+  ).run(course, groupName, nowSql());
+
+  res.json({ ok: true, inserted: result.changes > 0 });
+});
+
+// ---------------------------------------------------------------------------
 // DELETE /adminapi/deletetable
 // ---------------------------------------------------------------------------
 router.delete('/deletetable', requireAuth, (_req, res) => {
@@ -344,6 +485,77 @@ router.post('/updatetimes', requireAuth, (req, res) => {
   });
 
   run();
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Unified Window admin endpoints
+// ---------------------------------------------------------------------------
+router.get('/unified-window/tickets', requireAuth, (req, res) => {
+  const status = String(req.query.status ?? '').trim();
+  const role = String(req.query.role ?? '').trim();
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit ?? '100', 10), 1), 500);
+
+  const conditions = [];
+  const params = {};
+  if (status) {
+    conditions.push('status = @status');
+    params.status = status;
+  }
+  if (role) {
+    conditions.push('requester_role = @role');
+    params.role = role;
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const rows = pairsDb.prepare(
+    `SELECT id, requester_role, requester_name, requester_email, subject, message,
+            status, source, assignee, response_text, internal_note, created_at, updated_at
+     FROM unified_window_tickets
+     ${where}
+     ORDER BY id DESC
+     LIMIT ${limit}`
+  ).all(params);
+
+  res.json(rows);
+});
+
+router.patch('/unified-window/tickets/:id', requireAuth, (req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ticket id' });
+  }
+
+  const updates = [];
+  const params = { id, updated_at: nowSql() };
+
+  if (req.body?.status !== undefined) {
+    const status = String(req.body.status).trim();
+    const allowed = new Set(['new', 'in_progress', 'resolved', 'closed']);
+    if (!allowed.has(status)) {
+      return res.status(400).json({ error: 'status must be one of: new, in_progress, resolved, closed' });
+    }
+    updates.push('status = @status');
+    params.status = status;
+  }
+
+  for (const field of ['assignee', 'response_text', 'internal_note']) {
+    if (req.body?.[field] !== undefined) {
+      updates.push(`${field} = @${field}`);
+      params[field] = String(req.body[field] ?? '').trim() || null;
+    }
+  }
+
+  if (!updates.length) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  updates.push('updated_at = @updated_at');
+  const result = pairsDb.prepare(
+    `UPDATE unified_window_tickets SET ${updates.join(', ')} WHERE id = @id`
+  ).run(params);
+
+  if (!result.changes) return res.status(404).json({ error: 'Ticket not found' });
   res.json({ ok: true });
 });
 

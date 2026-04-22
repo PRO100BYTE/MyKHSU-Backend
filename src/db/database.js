@@ -57,6 +57,36 @@ function initPairsSchema(db) {
       last_change TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS course_catalog (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      course     INTEGER NOT NULL UNIQUE,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS group_catalog (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      course     INTEGER NOT NULL,
+      group_name TEXT    NOT NULL,
+      created_at TEXT,
+      UNIQUE(course, group_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS unified_window_tickets (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      requester_role  TEXT    NOT NULL,
+      requester_name  TEXT,
+      requester_email TEXT,
+      subject         TEXT    NOT NULL,
+      message         TEXT    NOT NULL,
+      status          TEXT    NOT NULL DEFAULT 'new',
+      source          TEXT    NOT NULL DEFAULT 'web',
+      assignee        TEXT,
+      response_text   TEXT,
+      internal_note   TEXT,
+      created_at      TEXT    NOT NULL,
+      updated_at      TEXT    NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pairs_week_number ON pairs(week_number);
     CREATE INDEX IF NOT EXISTS idx_pairs_date        ON pairs(date);
     CREATE INDEX IF NOT EXISTS idx_pairs_date_start  ON pairs(date_start);
@@ -66,6 +96,9 @@ function initPairsSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_pairs_teacher     ON pairs(teacher);
     CREATE INDEX IF NOT EXISTS idx_pairs_auditory    ON pairs(auditory);
     CREATE INDEX IF NOT EXISTS idx_pairs_subject     ON pairs(subject);
+    CREATE INDEX IF NOT EXISTS idx_unified_status     ON unified_window_tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_unified_created_at ON unified_window_tickets(created_at);
+    CREATE INDEX IF NOT EXISTS idx_group_catalog_name ON group_catalog(group_name);
   `);
 }
 
@@ -76,6 +109,10 @@ function initUsersSchema(db) {
       username   TEXT NOT NULL UNIQUE,
       password   TEXT NOT NULL,
       is_active  INTEGER NOT NULL DEFAULT 1,
+      first_name TEXT,
+      last_name  TEXT,
+      position   TEXT,
+      email      TEXT,
       created_at TEXT,
       updated_at TEXT
     );
@@ -85,6 +122,18 @@ function initUsersSchema(db) {
   const columns = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
   if (!columns.includes('is_active')) {
     db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!columns.includes('first_name')) {
+    db.exec('ALTER TABLE users ADD COLUMN first_name TEXT');
+  }
+  if (!columns.includes('last_name')) {
+    db.exec('ALTER TABLE users ADD COLUMN last_name TEXT');
+  }
+  if (!columns.includes('position')) {
+    db.exec('ALTER TABLE users ADD COLUMN position TEXT');
+  }
+  if (!columns.includes('email')) {
+    db.exec('ALTER TABLE users ADD COLUMN email TEXT');
   }
   if (!columns.includes('created_at')) {
     db.exec('ALTER TABLE users ADD COLUMN created_at TEXT');

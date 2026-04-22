@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import api from '../api';
 
 export default function ScheduleScreen() {
+          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
   const [tab, setTab] = useState('upload');
 
   return (
@@ -33,7 +34,187 @@ export default function ScheduleScreen() {
       </div>
 
       {tab === 'upload' && <UploadTab />}
+      {tab === 'manual' && <ManualTab />}
       {tab === 'delete' && <DeleteTab />}
+    </div>
+  );
+}
+
+function ManualTab() {
+  const [course, setCourse] = useState('1');
+  const [group, setGroup] = useState('');
+  const [weekNumber, setWeekNumber] = useState('1');
+  const [date, setDate] = useState('');
+  const [mode, setMode] = useState('day');
+  const [weekday, setWeekday] = useState('Понедельник');
+  const [catalogCourse, setCatalogCourse] = useState('');
+  const [catalogGroupCourse, setCatalogGroupCourse] = useState('1');
+  const [catalogGroupName, setCatalogGroupName] = useState('');
+  const [lessons, setLessons] = useState([{ time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const updateLesson = (index, field, value) => {
+    setLessons(prev => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addLesson = () => {
+    setLessons(prev => [...prev, { time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+  };
+
+  const removeLesson = (index) => {
+    setLessons(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const createCatalogCourse = async () => {
+    const num = Number.parseInt(catalogCourse, 10);
+    if (Number.isNaN(num)) {
+      alert('Введите номер курса');
+      return;
+    }
+    const resp = await api.createCatalogCourse(num);
+    if (!resp?.ok) {
+      alert(resp?.data?.error || 'Не удалось добавить курс');
+      return;
+    }
+    setCatalogCourse('');
+    setNotice('Курс добавлен в каталог');
+  };
+
+  const createCatalogGroup = async () => {
+    if (!catalogGroupName.trim()) {
+      alert('Введите название группы');
+      return;
+    }
+    const resp = await api.createCatalogGroup({ course: Number.parseInt(catalogGroupCourse, 10), group_name: catalogGroupName.trim() });
+    if (!resp?.ok) {
+      alert(resp?.data?.error || 'Не удалось добавить группу');
+      return;
+    }
+    setCatalogGroupName('');
+    setNotice('Группа добавлена в каталог');
+  };
+
+  const submitManual = async () => {
+    if (!group.trim()) {
+      alert('Укажите группу');
+      return;
+    }
+
+    const cleaned = lessons
+      .map((l) => ({ ...l, method: 'create' }))
+      .filter((l) => l.time || l.subject || l.teacher || l.auditory || l.type);
+
+    if (!cleaned.length) {
+      alert('Добавьте хотя бы одну строку пары');
+      return;
+    }
+
+    setLoading(true);
+    const payload = {
+      group: group.trim(),
+      course: Number.parseInt(course, 10),
+      date,
+      week_number: Number.parseInt(weekNumber, 10),
+      weekday,
+      lessons: cleaned,
+    };
+
+    const resp = await api.updatePairs(payload);
+    setLoading(false);
+    if (!resp?.ok) {
+      alert(resp?.data?.error || 'Не удалось сохранить расписание');
+      return;
+    }
+    setNotice('Расписание сохранено');
+  };
+
+  return (
+    <div className="card">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Ручное наполнение</div>
+          <div className="card__subtitle">Курсы, группы и пары по дню или неделе</div>
+        </div>
+      </div>
+      <div className="card__body" style={{ display: 'grid', gap: 14 }}>
+        {notice ? (
+          <div className="alert alert-success">
+            <ion-icon name="checkmark-circle-outline" />
+            {notice}
+          </div>
+        ) : null}
+
+        <div className="table-wrap" style={{ padding: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Добавить курс</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input" placeholder="Номер курса" value={catalogCourse} onChange={e => setCatalogCourse(e.target.value)} />
+            <button className="btn" onClick={createCatalogCourse}>Добавить курс</button>
+          </div>
+
+          <div style={{ fontWeight: 600, margin: '16px 0 8px' }}>Добавить группу</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input className="input" placeholder="Курс" value={catalogGroupCourse} onChange={e => setCatalogGroupCourse(e.target.value)} style={{ maxWidth: 100 }} />
+            <input className="input" placeholder="Название группы" value={catalogGroupName} onChange={e => setCatalogGroupName(e.target.value)} style={{ minWidth: 220 }} />
+            <button className="btn" onClick={createCatalogGroup}>Добавить группу</button>
+          </div>
+        </div>
+
+        <div className="table-wrap" style={{ padding: 12 }}>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))' }}>
+            <input className="input" placeholder="Курс" value={course} onChange={e => setCourse(e.target.value)} />
+            <input className="input" placeholder="Группа" value={group} onChange={e => setGroup(e.target.value)} />
+            <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
+            <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <select className="select" value={mode} onChange={e => setMode(e.target.value)}>
+              <option value="day">По дню</option>
+              <option value="week">По неделе</option>
+            </select>
+          </div>
+
+          {mode === 'day' ? (
+            <select className="select" style={{ marginTop: 10, maxWidth: 220 }} value={weekday} onChange={e => setWeekday(e.target.value)}>
+              {['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          ) : null}
+
+          <div className="table-wrap" style={{ marginTop: 12 }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Время</th>
+                  <th>Тип</th>
+                  <th>Предмет</th>
+                  <th>Преподаватель</th>
+                  <th>Аудитория</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {lessons.map((row, i) => (
+                  <tr key={i}>
+                    <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30" /></td>
+                    <td><input className="input" value={row.type} onChange={e => updateLesson(i, 'type', e.target.value)} placeholder="лекция" /></td>
+                    <td><input className="input" value={row.subject} onChange={e => updateLesson(i, 'subject', e.target.value)} placeholder="Математика" /></td>
+                    <td><input className="input" value={row.teacher} onChange={e => updateLesson(i, 'teacher', e.target.value)} placeholder="Иванов И.И." /></td>
+                    <td><input className="input" value={row.auditory} onChange={e => updateLesson(i, 'auditory', e.target.value)} placeholder="204" /></td>
+                    <td>
+                      <button className="btn btn-ghost" onClick={() => removeLesson(i)} disabled={lessons.length === 1}>Удалить</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+            <button className="btn" onClick={addLesson}>Добавить строку</button>
+            <button className="btn btn-primary" onClick={submitManual} disabled={loading}>
+              {loading ? 'Сохранение...' : 'Сохранить расписание'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

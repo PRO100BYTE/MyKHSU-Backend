@@ -7,6 +7,10 @@ import path from 'node:path';
 
 const router = Router();
 
+function nowSql() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/meta
 // Метаданные версии и сборки
@@ -149,11 +153,19 @@ router.get('/getgroups', (req, res) => {
   let rows;
   if (course !== undefined && course !== '') {
     rows = pairsDb.prepare(
-      'SELECT DISTINCT group_name FROM pairs WHERE course = ? ORDER BY group_name'
-    ).all(parseInt(course, 10));
+      `SELECT group_name FROM (
+         SELECT DISTINCT group_name FROM pairs WHERE course = ?
+         UNION
+         SELECT DISTINCT group_name FROM group_catalog WHERE course = ?
+       ) ORDER BY group_name`
+    ).all(parseInt(course, 10), parseInt(course, 10));
   } else {
     rows = pairsDb.prepare(
-      'SELECT DISTINCT group_name FROM pairs ORDER BY group_name'
+      `SELECT group_name FROM (
+         SELECT DISTINCT group_name FROM pairs
+         UNION
+         SELECT DISTINCT group_name FROM group_catalog
+       ) ORDER BY group_name`
     ).all();
   }
   res.json(rows.map(r => r.group_name));
@@ -174,9 +186,50 @@ router.get('/getgroups/:course', (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/getcourses', (_req, res) => {
   const rows = pairsDb.prepare(
-    'SELECT DISTINCT course FROM pairs ORDER BY course'
+    `SELECT course FROM (
+       SELECT DISTINCT course FROM pairs
+       UNION
+       SELECT DISTINCT course FROM course_catalog
+     ) ORDER BY course`
   ).all();
   res.json(rows.map(r => r.course));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/unified-window/tickets
+// Body: { role, name, email, subject, message }
+// ---------------------------------------------------------------------------
+router.post('/unified-window/tickets', (req, res) => {
+  const role = String(req.body?.role ?? '').trim().toLowerCase();
+  const name = String(req.body?.name ?? '').trim();
+  const email = String(req.body?.email ?? '').trim();
+  const subject = String(req.body?.subject ?? '').trim();
+  const message = String(req.body?.message ?? '').trim();
+
+  const allowedRoles = new Set(['visitor', 'student', 'teacher']);
+  if (!allowedRoles.has(role)) {
+    return res.status(400).json({ error: 'role must be one of: visitor, student, teacher' });
+  }
+  if (!subject || !message) {
+    return res.status(400).json({ error: 'subject and message are required' });
+  }
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'email is invalid' });
+  }
+
+  const now = nowSql();
+  const result = pairsDb.prepare(
+    `INSERT INTO unified_window_tickets
+      (requester_role, requester_name, requester_email, subject, message, status, source, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'new', 'web', ?, ?)`
+  ).run(role, name || null, email || null, subject, message, now, now);
+
+  res.json({
+    ok: true,
+    id: result.lastInsertRowid,
+    status: 'new',
+    tracking_code: `UW-${String(result.lastInsertRowid).padStart(6, '0')}`,
+  });
 });
 
 // ---------------------------------------------------------------------------
