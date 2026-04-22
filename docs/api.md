@@ -187,7 +187,36 @@
 
 ### GET `/api/unified-window/tickets/{token}`
 
-Статус и метаданные обращения по `access_token`.
+Статус и метаданные обращения по `access_token`. Включает историю смены статусов.
+
+**Ответ:**
+```json
+{
+  "id": 15,
+  "subject": "Проблема с загрузкой расписания",
+  "status": "in_progress",
+  "priority": "normal",
+  "contact_name": "Иван Иванов",
+  "created_at": "2026-04-22 12:00:00",
+  "updated_at": "2026-04-22 14:30:00",
+  "status_history": [
+    {
+      "from_status": "open",
+      "to_status": "in_progress",
+      "changed_by": "admin_user",
+      "comment": "Начал детальное расследование",
+      "created_at": "2026-04-22 12:15:00"
+    },
+    {
+      "from_status": "in_progress",
+      "to_status": "resolved",
+      "changed_by": "admin_user",
+      "comment": "Проблема решена",
+      "created_at": "2026-04-22 14:30:00"
+    }
+  ]
+}
+```
 
 ---
 
@@ -201,6 +230,8 @@
 
 Добавить сообщение пользователя в существующее обращение.
 
+**Ограничение:** если статус обращения `'closed'`, то отправка сообщений запрещена (HTTP 400).
+
 ```json
 // Request
 {
@@ -210,6 +241,9 @@
 
 // Response
 { "ok": true, "id": 101 }
+
+// Error (если обращение закрыто)
+{ "error": "Ticket is closed" }
 ```
 
 ---
@@ -598,6 +632,80 @@
 ```
 
 Поле `method`: `create` | `update` | `delete` | `pass`.
+
+---
+
+### GET `/adminapi/pairs`
+
+Получить существующие пары для редактирования (в табличном виде).
+
+**Query-параметры:**
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| `group` | string | — | Название группы для фильтра |
+| `course` | number | — | Номер курса для фильтра |
+| `week_number` | number | — | Номер недели для фильтра |
+
+**Ответ:** массив пар с временем начала/окончания
+
+```json
+[
+  {
+    "id": 42,
+    "weekday": 3,
+    "course": 2,
+    "group_name": "ИТ-21",
+    "date": "2026-04-22",
+    "week_number": 15,
+    "time": 1,
+    "type": "Лекция",
+    "subject": "Математика",
+    "teacher": "Иванов И.И.",
+    "auditory": "101",
+    "time_start": "08:00",
+    "time_end": "09:30"
+  }
+]
+```
+
+---
+
+### PUT `/adminapi/pairs/:id`
+
+Обновить существующую пару.
+
+**Параметры пути:** `id` (number)
+
+**Body:**
+```json
+{
+  "weekday": 3,
+  "course": 2,
+  "group_name": "ИТ-21",
+  "date": "2026-04-22",
+  "week_number": 15,
+  "time": 1,
+  "type": "Лекция",
+  "subject": "Математика",
+  "teacher": "Иванов И.И.",
+  "auditory": "101"
+}
+```
+
+**Response:** `{ "ok": true }`
+
+---
+
+### DELETE `/adminapi/pairs/:id`
+
+Удалить пару.
+
+**Параметры пути:** `id` (number)
+
+**Response:** `{ "ok": true }`
+
+---
 
 Дополнительно:
 

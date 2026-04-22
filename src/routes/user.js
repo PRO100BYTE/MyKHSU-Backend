@@ -511,6 +511,10 @@ router.get('/unified-window/tickets/:token', (req, res) => {
   const subjectText = decryptTicketField(ticket, 'subject')
   const contactNameText = decryptTicketField(ticket, 'contact_name')
 
+  const statusHistory = usersDb.prepare(
+    'SELECT from_status, to_status, changed_by, comment, created_at FROM unified_window_status_history WHERE ticket_id = ? ORDER BY created_at ASC'
+  ).all(ticket.id)
+
   res.json({
     id: ticket.id,
     subject: subjectText,
@@ -520,6 +524,7 @@ router.get('/unified-window/tickets/:token', (req, res) => {
     due_at: ticket.due_at,
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
+    status_history: statusHistory,
   })
 })
 
