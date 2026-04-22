@@ -84,20 +84,71 @@
 | Колонка | Тип | Описание |
 |---|---|---|
 | `id` | INTEGER PK AUTOINCREMENT | Идентификатор обращения |
-| `requester_role` | TEXT NOT NULL | Роль отправителя (`visitor`, `student`, `teacher`) |
-| `requester_name` | TEXT | Имя отправителя |
-| `requester_email` | TEXT | Email отправителя |
-| `subject` | TEXT NOT NULL | Тема обращения |
-| `message` | TEXT NOT NULL | Текст обращения |
-| `status` | TEXT NOT NULL DEFAULT `new` | Статус (`new`, `in_progress`, `resolved`, `closed`) |
-| `source` | TEXT NOT NULL DEFAULT `web` | Источник обращения |
-| `assignee` | TEXT | Ответственный администратор |
-| `response_text` | TEXT | Ответ заявителю |
-| `internal_note` | TEXT | Внутренняя заметка |
+| `subject` | TEXT NOT NULL | Тема обращения (fallback для старых записей) |
+| `contact_email` | TEXT | Email обращения (fallback для старых записей) |
+| `contact_name` | TEXT | Имя обращения (fallback для старых записей) |
+| `encrypted_subject_iv/tag/data` | TEXT | Зашифрованная тема обращения (AES-256-GCM) |
+| `encrypted_contact_email_iv/tag/data` | TEXT | Зашифрованный email обращения (AES-256-GCM) |
+| `encrypted_contact_name_iv/tag/data` | TEXT | Зашифрованное имя обращения (AES-256-GCM) |
+| `contact_email_hash` | TEXT | SHA-256 email для поиска истории по email |
+| `status` | TEXT NOT NULL DEFAULT `open` | Статус (`open`, `in_progress`, `resolved`, `closed`) |
+| `priority` | TEXT NOT NULL DEFAULT `normal` | Приоритет (`low`, `normal`, `high`, `urgent`) |
+| `access_token` | TEXT UNIQUE | Токен пользователя для доступа к обращению |
+| `due_at` | TEXT | SLA-дедлайн |
+| `first_response_at` | TEXT | Время первого ответа агента |
+| `resolved_at` | TEXT | Время решения |
 | `created_at` | TEXT NOT NULL | Дата создания |
 | `updated_at` | TEXT NOT NULL | Дата последнего изменения |
 
-Индексы: `status`, `created_at`.
+Индексы: `status`, `priority`, `access_token`, `contact_email_hash`.
+
+---
+
+### Таблица `unified_window_messages`
+
+Сообщения в переписке обращения.
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Идентификатор сообщения |
+| `ticket_id` | INTEGER FK | Ссылка на `unified_window_tickets.id` |
+| `author_role` | TEXT | `user` или `agent` |
+| `author_name` | TEXT | Имя автора сообщения |
+| `encrypted_text_iv/tag/data` | TEXT | Зашифрованный текст сообщения (AES-256-GCM) |
+| `created_at` | TEXT NOT NULL | Дата создания |
+
+---
+
+### Таблица `unified_window_files`
+
+Вложения к обращениям.
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Идентификатор файла |
+| `ticket_id` | INTEGER FK | Ссылка на `unified_window_tickets.id` |
+| `message_id` | INTEGER FK NULL | Ссылка на сообщение (если файл привязан к сообщению) |
+| `original_name` | TEXT | Исходное имя файла |
+| `mime_type` | TEXT | MIME-тип |
+| `size_bytes` | INTEGER | Размер файла |
+| `encrypted_blob_iv/tag/data` | TEXT | Зашифрованный бинарный контент (AES-256-GCM) |
+| `created_at` | TEXT NOT NULL | Дата создания |
+
+---
+
+### Таблица `unified_window_status_history`
+
+История смены статусов обращения.
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Идентификатор записи |
+| `ticket_id` | INTEGER FK | Ссылка на `unified_window_tickets.id` |
+| `from_status` | TEXT | Предыдущий статус |
+| `to_status` | TEXT | Новый статус |
+| `changed_by` | TEXT | Кто изменил статус |
+| `comment` | TEXT | Комментарий |
+| `created_at` | TEXT NOT NULL | Дата изменения |
 
 ---
 
@@ -113,6 +164,7 @@
 | `username` | TEXT NOT NULL UNIQUE | Логин (уникальный) |
 | `password` | TEXT NOT NULL | Хэш пароля (Argon2id) |
 | `is_active` | INTEGER NOT NULL DEFAULT 1 | Статус учётной записи (1=активен, 0=отключён) |
+| `role` | TEXT NOT NULL DEFAULT `admin` | Роль пользователя админки |
 | `first_name` | TEXT | Имя пользователя |
 | `last_name` | TEXT | Фамилия пользователя |
 | `position` | TEXT | Должность |
