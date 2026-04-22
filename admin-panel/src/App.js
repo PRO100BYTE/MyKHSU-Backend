@@ -16,26 +16,16 @@ import BrandMark from './components/BrandMark';
 import { ADMIN_UI } from './constants';
 
 const NAV_ITEMS = [
-  { to: '/dashboard', icon: 'grid-outline',         label: 'Дашборд' },
-  { to: '/schedule',  icon: 'calendar-outline',      label: 'Расписание' },
-  { to: '/times',     icon: 'alarm-outline',          label: 'Звонки' },
-  { to: '/news',      icon: 'newspaper-outline',      label: 'Новости' },
-  { to: '/users',     icon: 'people-outline',         label: 'Пользователи' },
-  { to: '/unified-window', icon: 'mail-open-outline', label: 'Единое окно' },
+  { to: '/dashboard', icon: 'grid-outline',         label: 'Дашборд', requiredPerms: [] },
+  { to: '/schedule',  icon: 'calendar-outline',      label: 'Расписание', requiredPerms: ['schedule:write'] },
+  { to: '/times',     icon: 'alarm-outline',          label: 'Звонки', requiredPerms: ['times:write'] },
+  { to: '/news',      icon: 'newspaper-outline',      label: 'Новости', requiredPerms: ['news:write'] },
+  { to: '/users',     icon: 'people-outline',         label: 'Пользователи', requiredPerms: ['users:write'] },
+  { to: '/unified-window', icon: 'mail-open-outline', label: 'Единое окно', requiredPerms: ['unified_window:write'] },
 ];
 
-const TITLES = {
-  '/dashboard': 'Дашборд',
-  '/schedule':  'Расписание',
-  '/times':     'Расписание звонков',
-  '/news':      'Новости',
-  '/users':     'Пользователи',
-  '/unified-window': 'Единое окно',
-  '/appearance': 'Внешний вид',
-};
-
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
   const { showNavLabels, uiDensity } = useTheme();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 768);
@@ -79,7 +69,21 @@ export default function App() {
     return <Routes><Route path="/login" element={<LoginScreen />} /></Routes>;
   }
 
+  // Фильтруем nav items по правам
+  const visibleNavItems = NAV_ITEMS.filter(item =>
+    item.requiredPerms.length === 0 || item.requiredPerms.some(p => hasPermission(p))
+  );
+
   const currentPath = '/' + location.pathname.split('/').slice(-1)[0];
+  const TITLES = {
+    '/dashboard': 'Дашборд',
+    '/schedule':  'Расписание',
+    '/times':     'Расписание звонков',
+    '/news':      'Новости',
+    '/users':     'Пользователи',
+    '/unified-window': 'Единое окно',
+    '/appearance': 'Внешний вид',
+  };
   const title = TITLES[currentPath] ?? 'Панель администратора';
 
   return (
@@ -101,7 +105,7 @@ export default function App() {
         </div>
 
         <nav className="sidebar__nav">
-          {NAV_ITEMS.map(item => (
+          {visibleNavItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -161,11 +165,11 @@ export default function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardScreen />} />
-            <Route path="/schedule/*" element={<ScheduleScreen />} />
-            <Route path="/times" element={<TimesScreen />} />
-            <Route path="/news" element={<NewsScreen />} />
-            <Route path="/users" element={<UsersScreen />} />
-            <Route path="/unified-window" element={<UnifiedWindowScreen />} />
+            <Route path="/schedule/*" element={<ProtectedRoute requiredPerms={['schedule:write']}><ScheduleScreen /></ProtectedRoute>} />
+            <Route path="/times" element={<ProtectedRoute requiredPerms={['times:write']}><TimesScreen /></ProtectedRoute>} />
+            <Route path="/news" element={<ProtectedRoute requiredPerms={['news:write']}><NewsScreen /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiredPerms={['users:write']}><UsersScreen /></ProtectedRoute>} />
+            <Route path="/unified-window" element={<ProtectedRoute requiredPerms={['unified_window:write']}><UnifiedWindowScreen /></ProtectedRoute>} />
             <Route path="/appearance" element={<AppearanceScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -175,6 +179,25 @@ export default function App() {
 
     </div>
   );
+}
+
+function ProtectedRoute({ requiredPerms, children }) {
+  const { hasPermission } = useAuth();
+  
+  // Проверяем есть ли хотя бы одно необходимое право
+  const hasAccess = requiredPerms.length === 0 || requiredPerms.some(p => hasPermission(p));
+  
+  if (!hasAccess) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '400px', color: 'var(--text-secondary)' }}>
+        <ion-icon name="lock-closed-outline" style={{ fontSize: '48px', marginBottom: '16px', color: 'var(--text-tertiary)' }} />
+        <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Доступ закрыт</div>
+        <div style={{ fontSize: '14px', textAlign: 'center' }}>У вас нет прав для просмотра этого раздела</div>
+      </div>
+    );
+  }
+  
+  return children;
 }
 
 function LogoutButton({ menu = false }) {

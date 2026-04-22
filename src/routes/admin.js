@@ -212,7 +212,15 @@ router.post('/login', async (req, res) => {
 // POST /adminapi/checktoken
 // ---------------------------------------------------------------------------
 router.post('/checktoken', requireAuth, (req, res) => {
-  res.json({ valid: true, user: req.user });
+  res.json({
+    valid: true,
+    user: req.user,
+    permissions: [
+      'schedule:read', 'schedule:write', 'times:write', 'catalog:write',
+      'news:read', 'news:write', 'users:read', 'users:write',
+      'unified_window:read', 'unified_window:write'
+    ].filter(perm => hasPermission(req.user.role, perm))
+  });
 });
 
 // ---------------------------------------------------------------------------
