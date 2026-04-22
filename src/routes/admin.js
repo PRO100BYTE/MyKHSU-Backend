@@ -197,10 +197,10 @@ router.patch('/profile', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /adminapi/users
 // ---------------------------------------------------------------------------
-router.get('/users', requireAuth, (_req, res) => {
+router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res) => {
   const users = usersDb
     .prepare(
-      `SELECT id, username, is_active, created_at, updated_at
+      `SELECT id, username, role, is_active, created_at, updated_at
        FROM users
        ORDER BY username COLLATE NOCASE`
     )
@@ -209,6 +209,7 @@ router.get('/users', requireAuth, (_req, res) => {
   res.json(users.map(u => ({
     id: u.id,
     username: u.username,
+    role: u.role || 'admin',
     is_active: Boolean(u.is_active),
     created_at: u.created_at ?? null,
     updated_at: u.updated_at ?? null,
@@ -219,8 +220,8 @@ router.get('/users', requireAuth, (_req, res) => {
 // POST /adminapi/users
 // Body: { username, password, is_active? }
 // ---------------------------------------------------------------------------
-router.post('/users', requireAuth, async (req, res) => {
-  const { username, password, is_active } = req.body ?? {};
+router.post('/users', requireAuth, requirePermission('users:manage'), async (req, res) => {
+  const { username, password, role, is_active } = req.body ?? {};
   const safeUsername = String(username ?? '').trim();
 
   if (!safeUsername || !password) {
@@ -238,11 +239,16 @@ router.post('/users', requireAuth, async (req, res) => {
     return res.status(409).json({ error: 'username already exists' });
   }
 
+  const safeRole = String(role ?? 'admin').trim();
+  if (!AVAILABLE_ROLES.includes(safeRole)) {
+    return res.status(400).json({ error: `role must be one of: ${AVAILABLE_ROLES.join(', ')}` });
+  }
+
   const hash = await argon2.hash(password, { type: argon2.argon2id });
   const now = nowSql();
   const result = usersDb
-    .prepare('INSERT INTO users (username, password, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-    .run(safeUsername, hash, is_active === false ? 0 : 1, now, now);
+    .prepare('INSERT INTO users (username, password, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(safeUsername, hash, safeRole, is_active === false ? 0 : 1, now, now);
 
   res.json({ ok: true, id: result.lastInsertRowid });
 });
@@ -251,11 +257,11 @@ router.post('/users', requireAuth, async (req, res) => {
 // PATCH /adminapi/users/:id
 // Body: { username?, password?, is_active? }
 // ---------------------------------------------------------------------------
-router.patch('/users/:id', requireAuth, async (req, res) => {
+router.patch('/users/:id', requireAuth, requirePermission('users:manage'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid user id' });
 
-  const target = usersDb.prepare('SELECT id, username FROM users WHERE id = ?').get(id);
+  const target = usersDb.prepare('SELECT id, username, role FROM users WHERE id = ?').get(id);
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const updates = [];
@@ -279,6 +285,15 @@ router.patch('/users/:id', requireAuth, async (req, res) => {
     }
     params.password = await argon2.hash(pwd, { type: argon2.argon2id });
     updates.push('password = @password');
+  }
+
+  if (req.body?.role !== undefined) {
+    const safeRole = String(req.body.role ?? '').trim();
+    if (!AVAILABLE_ROLES.includes(safeRole)) {
+      return res.status(400).json({ error: `role must be one of: ${AVAILABLE_ROLES.join(', ')}` });
+    }
+    params.role = safeRole;
+    updates.push('role = @role');
   }
 
   if (req.body?.is_active !== undefined) {
