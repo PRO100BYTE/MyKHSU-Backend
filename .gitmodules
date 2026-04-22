@@ -1,0 +1,3 @@
+[submodule "mykhsu-web"]
+	path = mykhsu-web
+	url = https://github.com/PRO100BYTE/MyKHSU-web.git
