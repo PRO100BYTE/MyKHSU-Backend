@@ -2,10 +2,10 @@ import React, { useState, useRef } from 'react';
 import api from '../api';
 
 export default function ScheduleScreen() {
-          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
   const [tab, setTab] = useState('upload');
 
   return (
+          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
     <div className="screen-stack">
       <div className="screen-hero">
         <div className="screen-hero__icon">
