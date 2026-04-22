@@ -23,7 +23,7 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <div className="center-loader">
         <span className="spinner spinner-lg" />
       </div>
     );
@@ -36,7 +36,17 @@ export default function DashboardScreen() {
   const lastUpdate = stats?.lastUpdate?.last_update ?? 'Никогда';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="screen-stack screen-stack--lg">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="grid-outline" />
+        </div>
+        <div>
+          <div className="screen-hero__title">Дашборд</div>
+          <div className="screen-hero__sub">Оперативная сводка и быстрые действия</div>
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="stats-grid">
         <StatCard icon="calendar-outline" value={weekCount} label="Недель в расписании" />
@@ -53,7 +63,7 @@ export default function DashboardScreen() {
             <div className="card__subtitle">Часто используемые операции</div>
           </div>
         </div>
-        <div className="card__body" style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        <div className="card__body actions-row">
           <QuickAction icon="cloud-upload-outline" label="Загрузить расписание" href="/admin-panel/schedule/upload" color="var(--accent)" />
           <QuickAction icon="pencil-outline" label="Управление новостями" href="/admin-panel/news" color="#3B82F6" />
           <QuickAction icon="alarm-outline" label="Расписание звонков" href="/admin-panel/times" color="#8B5CF6" />
@@ -67,7 +77,7 @@ export default function DashboardScreen() {
         <div className="card__header">
           <div className="card__title">О системе</div>
         </div>
-        <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="card__body info-list">
           <InfoRow label="Версия API" value={`${info.api_version ?? '—'} (Node.js)`} />
           <InfoRow label="Версия приложения" value={info.app_version ?? '—'} />
           <InfoRow label="Номер билда" value={info.build_number ?? '—'} />
@@ -86,7 +96,7 @@ function StatCard({ icon, value, label, small }) {
       <div className="stat-card__icon">
         <ion-icon name={icon} />
       </div>
-      <div className={small ? undefined : "stat-card__value"} style={small ? { fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 } : undefined}>
+      <div className={small ? 'stat-card__value stat-card__value--small' : 'stat-card__value'}>
         {value}
       </div>
       <div className="stat-card__label">{label}</div>
@@ -109,9 +119,9 @@ function QuickAction({ icon, label, href, color, danger }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '4px 0', borderBottom: '0.5px solid var(--border)' }}>
-      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontWeight: 600 }}>{value}</span>
+    <div className="info-row">
+      <span className="info-row__label">{label}</span>
+      <span className="info-row__value">{value}</span>
     </div>
   );
 }

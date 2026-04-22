@@ -41,8 +41,18 @@ export default function NewsScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+    <div className="screen-stack">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="newspaper-outline" />
+        </div>
+        <div>
+          <div className="screen-hero__title">Новости</div>
+          <div className="screen-hero__sub">Лента объявлений для пользователей приложения</div>
+        </div>
+      </div>
+
+      <div className="top-actions">
         <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
           <ion-icon name="add-circle-outline" />
           Создать новость
@@ -69,30 +79,30 @@ export default function NewsScreen() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: 60 }}>ID</th>
+                  <th className="table-col-id">ID</th>
                   <th>Содержание</th>
                   <th>Дата</th>
                   <th>Изменено</th>
-                  <th style={{ width: 90 }}>Действия</th>
+                  <th className="table-col-actions">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {news.map(n => (
                   <tr key={n.id}>
                     <td><span className="badge badge-gray">{n.id}</span></td>
-                    <td style={{ maxWidth: 360 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    <td className="table-cell-truncate-wrap">
+                      <div className="table-cell-truncate">
                         {n.content}
                       </div>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text-secondary)' }}>{n.date}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text-tertiary)' }}>{n.last_change ?? '—'}</td>
+                    <td className="table-cell-muted">{n.date}</td>
+                    <td className="table-cell-muted table-cell-muted--weak">{n.last_change ?? '—'}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div className="table-actions-inline">
                         <button className="btn-icon" title="Редактировать" onClick={() => setModal({ mode: 'edit', item: n })}>
                           <ion-icon name="pencil-outline" />
                         </button>
-                        <button className="btn-icon" title="Удалить" onClick={() => handleDelete(n.id)} style={{ color: 'var(--danger)' }}>
+                        <button className="btn-icon btn-icon--danger" title="Удалить" onClick={() => handleDelete(n.id)}>
                           <ion-icon name="trash-outline" />
                         </button>
                       </div>
@@ -153,7 +163,7 @@ function NewsModal({ mode, item, onSave, onClose }) {
           <div className="modal__footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Отмена</button>
             <button type="submit" className="btn btn-primary" disabled={loading || !content.trim()}>
-              {loading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : null}
+              {loading ? <span className="spinner spinner-sm" /> : null}
               {mode === 'create' ? 'Создать' : 'Сохранить'}
             </button>
           </div>

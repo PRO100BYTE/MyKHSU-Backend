@@ -8,6 +8,7 @@ import ScheduleScreen from './screens/ScheduleScreen';
 import NewsScreen from './screens/NewsScreen';
 import TimesScreen from './screens/TimesScreen';
 import UsersScreen from './screens/UsersScreen';
+import AppearanceScreen from './screens/AppearanceScreen';
 import BrandMark from './components/BrandMark';
 import { ADMIN_ACCENT_COLORS, ADMIN_THEMES, ADMIN_UI } from './constants';
 
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { to: '/times',     icon: 'alarm-outline',          label: 'Звонки' },
   { to: '/news',      icon: 'newspaper-outline',      label: 'Новости' },
   { to: '/users',     icon: 'people-outline',         label: 'Пользователи' },
+  { to: '/appearance', icon: 'color-palette-outline', label: 'Внешний вид' },
 ];
 
 const TITLES = {
@@ -25,11 +27,12 @@ const TITLES = {
   '/times':     'Расписание звонков',
   '/news':      'Новости',
   '/users':     'Пользователи',
+  '/appearance': 'Внешний вид',
 };
 
 export default function App() {
   const { user, loading } = useAuth();
-  const { theme, accentColor, toggle, setTheme, setAccentColor } = useTheme();
+  const { theme, accentColor, showNavLabels, uiDensity, toggle, setTheme, setAccentColor } = useTheme();
   const location = useLocation();
 
   if (loading) {
@@ -49,7 +52,7 @@ export default function App() {
   const title = TITLES[currentPath] ?? 'Панель администратора';
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout${uiDensity === 'compact' ? ' admin-layout--compact' : ''}`}>
       <div className="admin-layout__glow admin-layout__glow--primary" />
       <div className="admin-layout__glow admin-layout__glow--secondary" />
       <div className="admin-layout__noise" />
@@ -73,9 +76,10 @@ export default function App() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => `sidebar__item${isActive ? ' active' : ''}`}
+              title={!showNavLabels ? item.label : undefined}
             >
               <ion-icon name={item.icon} />
-              {item.label}
+              {showNavLabels ? <span className="sidebar__item-label">{item.label}</span> : null}
             </NavLink>
           ))}
         </nav>
@@ -146,6 +150,7 @@ export default function App() {
             <Route path="/times" element={<TimesScreen />} />
             <Route path="/news" element={<NewsScreen />} />
             <Route path="/users" element={<UsersScreen />} />
+            <Route path="/appearance" element={<AppearanceScreen />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>

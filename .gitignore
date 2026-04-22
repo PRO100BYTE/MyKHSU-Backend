@@ -3,3 +3,6 @@ data/
 .env
 *.sqlite
 *.log
+*/build/
+build/
+web-build/

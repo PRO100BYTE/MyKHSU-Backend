@@ -73,7 +73,17 @@ export default function TimesScreen() {
   const hasChanges = Object.keys(changes).length > 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="screen-stack">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="alarm-outline" />
+        </div>
+        <div>
+          <div className="screen-hero__title">Расписание звонков</div>
+          <div className="screen-hero__sub">Гибкое редактирование времени пар</div>
+        </div>
+      </div>
+
       {alert && (
         <div className={`alert ${alert.ok ? 'alert-success' : 'alert-error'}`}>
           <ion-icon name={alert.ok ? 'checkmark-circle-outline' : 'alert-circle-outline'} />
@@ -87,13 +97,13 @@ export default function TimesScreen() {
             <div className="card__title">Расписание звонков</div>
             <div className="card__subtitle">Время начала и конца каждой пары</div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="table-actions-inline">
             <button className="btn btn-ghost btn-sm" onClick={handleAddRow}>
               <ion-icon name="add-outline" />Добавить
             </button>
             {hasChanges && (
               <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-                {saving ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <ion-icon name="save-outline" />}
+                {saving ? <span className="spinner spinner-sm" /> : <ion-icon name="save-outline" />}
                 Сохранить
               </button>
             )}
@@ -106,10 +116,10 @@ export default function TimesScreen() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: 60 }}>Пара №</th>
+                  <th className="table-col-id">Пара №</th>
                   <th>Начало</th>
                   <th>Конец</th>
-                  <th style={{ width: 60 }}>Удалить</th>
+                  <th className="table-col-id">Удалить</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,7 +133,7 @@ export default function TimesScreen() {
                   />
                 ))}
                 {displayRows.length === 0 && (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>Нет данных</td></tr>
+                  <tr><td colSpan={4} className="table-empty">Нет данных</td></tr>
                 )}
               </tbody>
             </table>
@@ -136,12 +146,11 @@ export default function TimesScreen() {
 
 function EditableRow({ row, isNew, onChange, onDelete }) {
   return (
-    <tr style={isNew ? { background: 'var(--accent-glass)' } : undefined}>
+    <tr className={isNew ? 'row-new' : ''}>
       <td>
         <input
           type="number"
-          className="form-input"
-          style={{ width: 70, padding: '6px 10px' }}
+          className="form-input form-input--table form-input--small"
           value={row.time ?? ''}
           onChange={e => onChange('time', e.target.value)}
         />
@@ -149,8 +158,7 @@ function EditableRow({ row, isNew, onChange, onDelete }) {
       <td>
         <input
           type="text"
-          className="form-input"
-          style={{ width: 100, padding: '6px 10px' }}
+          className="form-input form-input--table"
           placeholder="08:00"
           value={row.time_start ?? ''}
           onChange={e => onChange('time_start', e.target.value)}
@@ -159,15 +167,14 @@ function EditableRow({ row, isNew, onChange, onDelete }) {
       <td>
         <input
           type="text"
-          className="form-input"
-          style={{ width: 100, padding: '6px 10px' }}
+          className="form-input form-input--table"
           placeholder="09:30"
           value={row.time_end ?? ''}
           onChange={e => onChange('time_end', e.target.value)}
         />
       </td>
       <td>
-        <button className="btn-icon" onClick={onDelete} style={{ color: 'var(--danger)' }}>
+        <button className="btn-icon btn-icon--danger" onClick={onDelete}>
           <ion-icon name="trash-outline" />
         </button>
       </td>

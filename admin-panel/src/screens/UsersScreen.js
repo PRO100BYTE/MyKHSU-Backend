@@ -130,7 +130,17 @@ export default function UsersScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="screen-stack">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="people-outline" />
+        </div>
+        <div>
+          <div className="screen-hero__title">Пользователи</div>
+          <div className="screen-hero__sub">Управление доступом к административной панели</div>
+        </div>
+      </div>
+
       {okMessage && <div className="alert alert-success"><ion-icon name="checkmark-circle-outline" />{okMessage}</div>}
       {error && <div className="alert alert-error"><ion-icon name="warning-outline" />{error}</div>}
 
@@ -171,7 +181,7 @@ export default function UsersScreen() {
                     const isSelf = user?.uid === item.id || user?.username === item.username;
                     return (
                       <tr key={item.id}>
-                        <td style={{ fontWeight: 600 }}>{item.username}</td>
+                        <td className="table-cell-strong">{item.username}</td>
                         <td>
                           <span className={`badge ${item.is_active ? 'badge-green' : 'badge-gray'}`}>
                             {item.is_active ? 'Активен' : 'Отключен'}
@@ -180,7 +190,7 @@ export default function UsersScreen() {
                         <td>{formatDate(item.created_at)}</td>
                         <td>{formatDate(item.updated_at)}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <div className="table-actions-inline table-actions-inline--wrap">
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(item)} disabled={saving}>
                               <ion-icon name="create-outline" />
                               Редактировать
@@ -249,13 +259,16 @@ export default function UsersScreen() {
                 />
               </div>
 
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 14 }}>
+              <label className="switch-row">
+                <span>
+                  <strong>Учетная запись активна</strong>
+                  <small>Если выключить, пользователь не сможет войти</small>
+                </span>
                 <input
                   type="checkbox"
                   checked={form.is_active}
                   onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
                 />
-                Учетная запись активна
               </label>
 
               <div className="modal__footer">

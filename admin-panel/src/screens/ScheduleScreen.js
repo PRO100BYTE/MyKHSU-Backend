@@ -5,16 +5,25 @@ export default function ScheduleScreen() {
   const [tab, setTab] = useState('upload');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8 }}>
+    <div className="screen-stack">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="calendar-outline" />
+        </div>
+        <div>
+          <div className="screen-hero__title">Расписание</div>
+          <div className="screen-hero__sub">Импорт, обновление и очистка таблицы занятий</div>
+        </div>
+      </div>
+
+      <div className="segmented">
         {[
           { id: 'upload', label: 'Загрузить', icon: 'cloud-upload-outline' },
           { id: 'delete', label: 'Очистить', icon: 'trash-outline' },
         ].map(t => (
           <button
             key={t.id}
-            className={`btn ${tab === t.id ? 'btn-primary' : 'btn-ghost'}`}
+            className={`segmented__item${tab === t.id ? ' active' : ''}`}
             onClick={() => setTab(t.id)}
           >
             <ion-icon name={t.icon} />
