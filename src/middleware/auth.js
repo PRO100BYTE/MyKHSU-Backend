@@ -43,7 +43,7 @@ export function requireAuth(req, res, next) {
 
     req.user = {
       uid: payload.uid,
-      username: payload.username,
+      username: dbUser.username,
       role: dbUser.role ?? 'admin',
       first_name: dbUser.first_name ?? null,
       last_name: dbUser.last_name ?? null,
