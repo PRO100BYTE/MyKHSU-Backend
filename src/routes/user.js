@@ -151,12 +151,28 @@ router.get('/getgroups', (req, res) => {
   const course = req.query.course;
   let rows;
   if (course !== undefined && course !== '') {
+    const parsedCourse = parseInt(course, 10)
+    if (Number.isNaN(parsedCourse)) {
+      return res.status(400).json({ error: 'Invalid course' })
+    }
     rows = pairsDb.prepare(
-      'SELECT DISTINCT group_name FROM pairs WHERE course = ? ORDER BY group_name'
-    ).all(parseInt(course, 10));
+      `SELECT group_name FROM (
+         SELECT DISTINCT group_name FROM pairs WHERE course = ?
+         UNION
+         SELECT DISTINCT group_name FROM group_catalog WHERE course = ?
+       )
+       WHERE group_name IS NOT NULL AND TRIM(group_name) != ''
+       ORDER BY group_name`
+    ).all(parsedCourse, parsedCourse);
   } else {
     rows = pairsDb.prepare(
-      'SELECT DISTINCT group_name FROM pairs ORDER BY group_name'
+      `SELECT group_name FROM (
+         SELECT DISTINCT group_name FROM pairs
+         UNION
+         SELECT DISTINCT group_name FROM group_catalog
+       )
+       WHERE group_name IS NOT NULL AND TRIM(group_name) != ''
+       ORDER BY group_name`
     ).all();
   }
   res.json(rows.map(r => r.group_name));
@@ -167,8 +183,14 @@ router.get('/getgroups/:course', (req, res) => {
   const course = parseInt(req.params.course, 10);
   if (isNaN(course)) return res.status(400).json({ error: 'Invalid course' });
   const rows = pairsDb.prepare(
-    'SELECT DISTINCT group_name FROM pairs WHERE course = ? ORDER BY group_name'
-  ).all(course);
+    `SELECT group_name FROM (
+       SELECT DISTINCT group_name FROM pairs WHERE course = ?
+       UNION
+       SELECT DISTINCT group_name FROM group_catalog WHERE course = ?
+     )
+     WHERE group_name IS NOT NULL AND TRIM(group_name) != ''
+     ORDER BY group_name`
+  ).all(course, course);
   res.json(rows.map(r => r.group_name));
 });
 
@@ -177,7 +199,13 @@ router.get('/getgroups/:course', (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/getcourses', (_req, res) => {
   const rows = pairsDb.prepare(
-    'SELECT DISTINCT course FROM pairs ORDER BY course'
+    `SELECT course FROM (
+       SELECT DISTINCT course FROM pairs
+       UNION
+       SELECT DISTINCT course FROM course_catalog
+     )
+     WHERE course IS NOT NULL
+     ORDER BY course`
   ).all();
   res.json(rows.map(r => r.course));
 });
