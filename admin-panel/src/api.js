@@ -59,6 +59,9 @@ const api = {
   deleteNews: (id) => request('DELETE', `/deletenews?id=${id}`),
 
   // Пользователи админ-панели
+  getProfile: () => request('GET', '/profile'),
+  updateProfile: (payload) => request('PATCH', '/profile', payload),
+
   getUsers: () => request('GET', '/users'),
   createUser: (payload) => request('POST', '/users', payload),
   updateUser: (id, payload) => request('PATCH', `/users/${id}`, payload),

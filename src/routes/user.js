@@ -4,6 +4,7 @@ import { getWeekDates, getCurrentWeekNumber, normalizeDate } from '../utils/date
 import { APP_CONSTANTS } from '../constants.js';
 import { encryptText, decryptText, createAccessToken } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -350,6 +351,38 @@ function uwDueAt(priority) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
 }
 
+function normalizeNullableText(value, maxLen = 255) {
+  if (value === undefined || value === null) return null
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, maxLen)
+}
+
+function normalizeEmail(value) {
+  const email = normalizeNullableText(value, 255)
+  return email ? email.toLowerCase() : null
+}
+
+function emailHash(email) {
+  if (!email) return null
+  return createHash('sha256').update(email).digest('hex')
+}
+
+function decryptTicketField(row, field) {
+  const iv = row[`encrypted_${field}_iv`]
+  const tag = row[`encrypted_${field}_tag`]
+  const data = row[`encrypted_${field}_data`]
+
+  if (iv && tag && data) {
+    try {
+      return decryptText({ iv, tag, data })
+    } catch {
+      return row[field] ?? null
+    }
+  }
+  return row[field] ?? null
+}
+
 // POST /api/unified-window/tickets — создать обращение
 router.post('/unified-window/tickets', (req, res) => {
   const { subject, contact_email, contact_name, message, priority } = req.body ?? {}
@@ -363,18 +396,59 @@ router.post('/unified-window/tickets', (req, res) => {
 
   const validPriorities = ['low', 'normal', 'high', 'urgent']
   const safePriority = validPriorities.includes(priority) ? priority : 'normal'
+  const safeSubject = String(subject).trim()
+  const safeContactEmail = normalizeEmail(contact_email)
+  const safeContactName = normalizeNullableText(contact_name, 160)
   const accessToken = createAccessToken()
   const now = uwNowSql()
   const dueAt = uwDueAt(safePriority)
 
+  const encryptedSubject = encryptText(safeSubject)
+  const encryptedContactEmail = safeContactEmail ? encryptText(safeContactEmail) : null
+  const encryptedContactName = safeContactName ? encryptText(safeContactName) : null
+
   const ticketResult = usersDb.prepare(
-    `INSERT INTO unified_window_tickets (subject, contact_email, contact_name, status, priority, access_token, due_at, created_at, updated_at)
-     VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)`
+    `INSERT INTO unified_window_tickets (
+      subject,
+      contact_email,
+      contact_name,
+      encrypted_subject_iv,
+      encrypted_subject_tag,
+      encrypted_subject_data,
+      encrypted_contact_email_iv,
+      encrypted_contact_email_tag,
+      encrypted_contact_email_data,
+      encrypted_contact_name_iv,
+      encrypted_contact_name_tag,
+      encrypted_contact_name_data,
+      contact_email_hash,
+      status,
+      priority,
+      access_token,
+      due_at,
+      created_at,
+      updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)`
   ).run(
-    String(subject).trim(),
-    contact_email ?? null,
-    contact_name ?? null,
-    safePriority, accessToken, dueAt, now, now
+    safeSubject,
+    safeContactEmail,
+    safeContactName,
+    encryptedSubject.iv,
+    encryptedSubject.tag,
+    encryptedSubject.data,
+    encryptedContactEmail?.iv ?? null,
+    encryptedContactEmail?.tag ?? null,
+    encryptedContactEmail?.data ?? null,
+    encryptedContactName?.iv ?? null,
+    encryptedContactName?.tag ?? null,
+    encryptedContactName?.data ?? null,
+    emailHash(safeContactEmail),
+    safePriority,
+    accessToken,
+    dueAt,
+    now,
+    now,
   )
 
   const ticketId = ticketResult.lastInsertRowid
@@ -384,14 +458,14 @@ router.post('/unified-window/tickets', (req, res) => {
   usersDb.prepare(
     `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
      VALUES (?, 'user', ?, ?, ?, ?, ?)`
-  ).run(ticketId, contact_name ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
+  ).run(ticketId, safeContactName, encrypted.iv, encrypted.tag, encrypted.data, now)
 
   // Email-подтверждение создания тикета
-  if (contact_email) {
+  if (safeContactEmail) {
     sendUnifiedWindowEmail({
-      to: contact_email,
+      to: safeContactEmail,
       subject: `Обращение #${ticketId} принято`,
-      text: `Ваше обращение "${subject}" зарегистрировано.\nНомер обращения: ${ticketId}\nТокен для слежения: ${accessToken}`,
+      text: `Ваше обращение "${safeSubject}" зарегистрировано.\nНомер обращения: ${ticketId}\nТокен для слежения: ${accessToken}`,
     }).catch(() => {})
   }
 
@@ -406,16 +480,45 @@ router.get('/unified-window/tickets/:token', (req, res) => {
   const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
 
+  const subjectText = decryptTicketField(ticket, 'subject')
+  const contactNameText = decryptTicketField(ticket, 'contact_name')
+
   res.json({
     id: ticket.id,
-    subject: ticket.subject,
+    subject: subjectText,
     status: ticket.status,
     priority: ticket.priority,
-    contact_name: ticket.contact_name,
+    contact_name: contactNameText,
     due_at: ticket.due_at,
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
   })
+})
+
+// GET /api/unified-window/tickets?contact_email=... — список обращений по email
+router.get('/unified-window/tickets', (req, res) => {
+  const safeContactEmail = normalizeEmail(req.query.contact_email)
+  if (!safeContactEmail) return res.status(400).json({ error: 'contact_email is required' })
+
+  const rows = usersDb.prepare(
+    `SELECT * FROM unified_window_tickets
+     WHERE contact_email_hash = ?
+     ORDER BY created_at DESC
+     LIMIT 50`
+  ).all(emailHash(safeContactEmail))
+
+  const tickets = rows.map(ticket => ({
+    id: ticket.id,
+    access_token: ticket.access_token,
+    subject: decryptTicketField(ticket, 'subject'),
+    status: ticket.status,
+    priority: ticket.priority,
+    contact_name: decryptTicketField(ticket, 'contact_name'),
+    created_at: ticket.created_at,
+    updated_at: ticket.updated_at,
+  }))
+
+  res.json(tickets)
 })
 
 // GET /api/unified-window/tickets/:token/messages — получить сообщения по токену
@@ -453,11 +556,13 @@ router.post('/unified-window/tickets/:token/reply', (req, res) => {
 
   const encrypted = encryptText(String(message).trim())
   const now = uwNowSql()
+  const safeContactName = normalizeNullableText(contact_name, 160)
+  const fallbackContactName = decryptTicketField(ticket, 'contact_name')
 
   const result = usersDb.prepare(
     `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
      VALUES (?, 'user', ?, ?, ?, ?, ?)`
-  ).run(ticket.id, contact_name ?? ticket.contact_name ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
+  ).run(ticket.id, safeContactName ?? fallbackContactName ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
 
   // Переоткрыть тикет если был resolved
   if (ticket.status === 'resolved') {

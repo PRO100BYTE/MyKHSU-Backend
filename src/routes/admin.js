@@ -8,7 +8,7 @@ import { config } from '../config.js';
 import { importTimetable } from '../parsers/timetable.js';
 import { normalizeDate } from '../utils/dates.js';
 import { hasPermission, USER_ROLES } from '../utils/permissions.js';
-import { encryptText, decryptText, encryptBuffer, decryptBuffer, createAccessToken } from '../utils/uw-crypto.js';
+import { encryptText, decryptText, encryptBuffer, decryptBuffer } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,11 +60,14 @@ function recordStatusHistory(ticketId, fromStatus, toStatus, changedBy, comment)
  * Маппинг строки БД → объект тикета для ответа API.
  */
 function mapTicket(row) {
+  const subject = decryptTicketField(row, 'subject')
+  const contactEmail = decryptTicketField(row, 'contact_email')
+  const contactName = decryptTicketField(row, 'contact_name')
   return {
     id: row.id,
-    subject: row.subject,
-    contact_email: row.contact_email,
-    contact_name: row.contact_name,
+    subject,
+    contact_email: contactEmail,
+    contact_name: contactName,
     status: row.status,
     priority: row.priority,
     access_token: row.access_token,
@@ -74,6 +77,33 @@ function mapTicket(row) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
+}
+
+function decryptTicketField(row, field) {
+  const iv = row[`encrypted_${field}_iv`]
+  const tag = row[`encrypted_${field}_tag`]
+  const data = row[`encrypted_${field}_data`]
+
+  if (iv && tag && data) {
+    try {
+      return decryptText({ iv, tag, data })
+    } catch {
+      return row[field] ?? null
+    }
+  }
+  return row[field] ?? null
+}
+
+function normalizeNullableText(value, maxLen = 255) {
+  if (value === undefined || value === null) return null
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, maxLen)
+}
+
+function normalizeEmail(value) {
+  const email = normalizeNullableText(value, 255)
+  return email ? email.toLowerCase() : null
 }
 
 // ---------------------------------------------------------------------------
@@ -118,12 +148,86 @@ router.post('/checktoken', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /adminapi/profile
+// ---------------------------------------------------------------------------
+router.get('/profile', requireAuth, (req, res) => {
+  const profile = usersDb
+    .prepare('SELECT id, username, is_active, role, first_name, last_name, position, email, created_at, updated_at FROM users WHERE id = ?')
+    .get(req.user.uid)
+
+  if (!profile) return res.status(404).json({ error: 'User not found' })
+
+  res.json(profile)
+})
+
+// ---------------------------------------------------------------------------
+// PATCH /adminapi/profile
+// Body: { username?, first_name?, last_name?, position?, email?, current_password?, new_password? }
+// ---------------------------------------------------------------------------
+router.patch('/profile', requireAuth, async (req, res) => {
+  const me = usersDb.prepare('SELECT * FROM users WHERE id = ?').get(req.user.uid)
+  if (!me) return res.status(404).json({ error: 'User not found' })
+
+  const updates = []
+  const params = { id: req.user.uid, updatedAt: nowSql() }
+
+  if (req.body?.username !== undefined) {
+    const safeUsername = String(req.body.username ?? '').trim()
+    if (safeUsername.length < 3) {
+      return res.status(400).json({ error: 'username must be at least 3 characters' })
+    }
+    const conflict = usersDb.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(safeUsername, req.user.uid)
+    if (conflict) return res.status(409).json({ error: 'username already exists' })
+    params.username = safeUsername
+    updates.push('username = @username')
+  }
+
+  if (req.body?.first_name !== undefined) {
+    params.first_name = normalizeNullableText(req.body.first_name, 120)
+    updates.push('first_name = @first_name')
+  }
+  if (req.body?.last_name !== undefined) {
+    params.last_name = normalizeNullableText(req.body.last_name, 120)
+    updates.push('last_name = @last_name')
+  }
+  if (req.body?.position !== undefined) {
+    params.position = normalizeNullableText(req.body.position, 160)
+    updates.push('position = @position')
+  }
+  if (req.body?.email !== undefined) {
+    params.email = normalizeEmail(req.body.email)
+    updates.push('email = @email')
+  }
+
+  if (req.body?.new_password !== undefined && String(req.body.new_password).trim() !== '') {
+    const currentPassword = String(req.body.current_password ?? '')
+    const newPassword = String(req.body.new_password)
+    const valid = await argon2.verify(me.password, currentPassword)
+    if (!valid) return res.status(400).json({ error: 'current_password is invalid' })
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'new_password must be at least 8 characters' })
+    }
+    params.password = await argon2.hash(newPassword, { type: argon2.argon2id })
+    updates.push('password = @password')
+  }
+
+  if (!updates.length) {
+    return res.status(400).json({ error: 'No fields to update' })
+  }
+
+  updates.push('updated_at = @updatedAt')
+  usersDb.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = @id`).run(params)
+
+  res.json({ ok: true })
+})
+
+// ---------------------------------------------------------------------------
 // GET /adminapi/users
 // ---------------------------------------------------------------------------
 router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res) => {
   const users = usersDb
     .prepare(
-      `SELECT id, username, is_active, role, created_at, updated_at
+      `SELECT id, username, is_active, role, first_name, last_name, position, email, created_at, updated_at
        FROM users
        ORDER BY username COLLATE NOCASE`
     )
@@ -134,6 +238,10 @@ router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res)
     username: u.username,
     is_active: Boolean(u.is_active),
     role: u.role ?? 'admin',
+    first_name: u.first_name ?? null,
+    last_name: u.last_name ?? null,
+    position: u.position ?? null,
+    email: u.email ?? null,
     created_at: u.created_at ?? null,
     updated_at: u.updated_at ?? null,
   })));
@@ -144,7 +252,7 @@ router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res)
 // Body: { username, password, is_active?, role? }
 // ---------------------------------------------------------------------------
 router.post('/users', requireAuth, requirePermission('users:manage'), async (req, res) => {
-  const { username, password, is_active, role } = req.body ?? {};
+  const { username, password, is_active, role, first_name, last_name, position, email } = req.body ?? {};
   const safeUsername = String(username ?? '').trim();
 
   if (!safeUsername || !password) {
@@ -168,8 +276,19 @@ router.post('/users', requireAuth, requirePermission('users:manage'), async (req
   const hash = await argon2.hash(password, { type: argon2.argon2id });
   const now = nowSql();
   const result = usersDb
-    .prepare('INSERT INTO users (username, password, is_active, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(safeUsername, hash, is_active === false ? 0 : 1, safeRole, now, now);
+    .prepare('INSERT INTO users (username, password, is_active, role, first_name, last_name, position, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(
+      safeUsername,
+      hash,
+      is_active === false ? 0 : 1,
+      safeRole,
+      normalizeNullableText(first_name, 120),
+      normalizeNullableText(last_name, 120),
+      normalizeNullableText(position, 160),
+      normalizeEmail(email),
+      now,
+      now,
+    );
 
   res.json({ ok: true, id: result.lastInsertRowid });
 });
@@ -224,6 +343,23 @@ router.patch('/users/:id', requireAuth, requirePermission('users:manage'), async
     }
     params.role = req.body.role
     updates.push('role = @role')
+  }
+
+  if (req.body?.first_name !== undefined) {
+    params.first_name = normalizeNullableText(req.body.first_name, 120)
+    updates.push('first_name = @first_name')
+  }
+  if (req.body?.last_name !== undefined) {
+    params.last_name = normalizeNullableText(req.body.last_name, 120)
+    updates.push('last_name = @last_name')
+  }
+  if (req.body?.position !== undefined) {
+    params.position = normalizeNullableText(req.body.position, 160)
+    updates.push('position = @position')
+  }
+  if (req.body?.email !== undefined) {
+    params.email = normalizeEmail(req.body.email)
+    updates.push('email = @email')
   }
 
   if (!updates.length) {
@@ -554,12 +690,15 @@ router.post('/unified-window/tickets/:id/messages', requireAuth, requirePermissi
       .run(now, now, id)
   }
 
+  const ticketEmail = decryptTicketField(ticket, 'contact_email')
+  const ticketSubject = decryptTicketField(ticket, 'subject')
+
   // Email-уведомление пользователю
-  if (ticket.contact_email) {
+  if (ticketEmail) {
     sendUnifiedWindowEmail({
-      to: ticket.contact_email,
-      subject: `Ответ на обращение #${id}: ${ticket.subject}`,
-      text: `Вам ответили по обращению "${ticket.subject}".\n\n${text}`,
+      to: ticketEmail,
+      subject: `Ответ на обращение #${id}: ${ticketSubject ?? 'Без темы'}`,
+      text: `Вам ответили по обращению "${ticketSubject ?? 'Без темы'}".\n\n${text}`,
     }).catch(() => {})
   }
 
@@ -644,13 +783,16 @@ router.patch('/unified-window/tickets/:id/status', requireAuth, requirePermissio
 
   recordStatusHistory(id, ticket.status, status, req.user.username, comment)
 
+  const ticketEmail = decryptTicketField(ticket, 'contact_email')
+  const ticketSubject = decryptTicketField(ticket, 'subject')
+
   // Email-уведомление
-  if (ticket.contact_email) {
+  if (ticketEmail) {
     const statusLabels = { open: 'Открыто', in_progress: 'В работе', resolved: 'Решено', closed: 'Закрыто' }
     sendUnifiedWindowEmail({
-      to: ticket.contact_email,
+      to: ticketEmail,
       subject: `Статус обращения #${id} изменён`,
-      text: `Статус вашего обращения "${ticket.subject}" изменён: ${statusLabels[status] ?? status}`,
+      text: `Статус вашего обращения "${ticketSubject ?? 'Без темы'}" изменён: ${statusLabels[status] ?? status}`,
     }).catch(() => {})
   }
 
