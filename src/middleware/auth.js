@@ -32,7 +32,7 @@ export function requireAuth(req, res, next) {
     }
 
     const dbUser = usersDb
-      .prepare('SELECT id, username, is_active, role FROM users WHERE id = ?')
+      .prepare('SELECT id, username, is_active, role, first_name, last_name, position, email FROM users WHERE id = ?')
       .get(payload.uid);
     if (!dbUser) {
       return res.status(401).json({ error: 'Unauthorized: user not found' });
@@ -41,7 +41,15 @@ export function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Forbidden: user is disabled' });
     }
 
-    req.user = { uid: payload.uid, username: payload.username, role: dbUser.role ?? 'admin' };
+    req.user = {
+      uid: payload.uid,
+      username: payload.username,
+      role: dbUser.role ?? 'admin',
+      first_name: dbUser.first_name ?? null,
+      last_name: dbUser.last_name ?? null,
+      position: dbUser.position ?? null,
+      email: dbUser.email ?? null,
+    };
     next();
   } catch {
     return res.status(401).json({ error: 'Unauthorized: invalid or expired token' });
