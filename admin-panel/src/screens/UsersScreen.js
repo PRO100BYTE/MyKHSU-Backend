@@ -7,6 +7,10 @@ const EMPTY_FORM = {
   password: '',
   is_active: true,
   role: 'admin',
+  first_name: '',
+  last_name: '',
+  position: '',
+  email: '',
 };
 
 const ROLE_LABELS = {
@@ -87,6 +91,10 @@ export default function UsersScreen() {
       password: '',
       is_active: Boolean(target.is_active),
       role: target.role ?? 'admin',
+      first_name: target.first_name ?? '',
+      last_name: target.last_name ?? '',
+      position: target.position ?? '',
+      email: target.email ?? '',
     });
     setIsModalOpen(true);
     setError('');
@@ -107,6 +115,10 @@ export default function UsersScreen() {
       username: form.username.trim(),
       is_active: Boolean(form.is_active),
       role: form.role,
+      first_name: form.first_name.trim(),
+      last_name: form.last_name.trim(),
+      position: form.position.trim(),
+      email: form.email.trim(),
     };
 
     if (!editTarget || form.password.trim()) {
@@ -204,6 +216,9 @@ export default function UsersScreen() {
                 <thead>
                   <tr>
                     <th>Логин</th>
+                    <th>ФИО</th>
+                    <th>Должность</th>
+                    <th>Email</th>
                     <th>Роль</th>
                     <th>Статус</th>
                     <th>Создан</th>
@@ -217,6 +232,9 @@ export default function UsersScreen() {
                     return (
                       <tr key={item.id}>
                         <td className="table-cell-strong">{item.username}</td>
+                        <td>{[item.first_name, item.last_name].filter(Boolean).join(' ') || '—'}</td>
+                        <td>{item.position || '—'}</td>
+                        <td>{item.email || '—'}</td>
                         <td>
                           <span className="badge badge-blue">
                             {ROLE_LABELS[item.role] ?? item.role ?? 'admin'}
@@ -296,6 +314,43 @@ export default function UsersScreen() {
                   type="password"
                   minLength={editTarget ? undefined : 8}
                   required={!editTarget}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Имя</label>
+                <input
+                  className="form-input"
+                  value={form.first_name}
+                  onChange={e => setForm(prev => ({ ...prev, first_name: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Фамилия</label>
+                <input
+                  className="form-input"
+                  value={form.last_name}
+                  onChange={e => setForm(prev => ({ ...prev, last_name: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Должность</label>
+                <input
+                  className="form-input"
+                  value={form.position}
+                  onChange={e => setForm(prev => ({ ...prev, position: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                 />
               </div>
 
