@@ -49,6 +49,10 @@ const api = {
     return request('POST', replace ? '/createtable' : '/updatetable', fd, true);
   },
   updatePairs: (payload) => request('POST', '/updatepairs', payload),
+  getCatalogCourses: () => request('GET', '/catalog/courses'),
+  createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
+  getCatalogGroups: (course) => request('GET', `/catalog/groups${course !== undefined && course !== '' ? `?course=${course}` : ''}`),
+  createCatalogGroup: (payload) => request('POST', '/catalog/groups', payload),
 
   // Звонки
   updateTimes: (items) => request('POST', '/updatetimes', items),
