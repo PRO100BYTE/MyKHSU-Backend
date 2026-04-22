@@ -32,6 +32,7 @@ npm run build
 ### Настройка proxy в dev-режиме
 
 В `MyKHSU-web/package.json` должно быть:
+
 ```json
 {
   "proxy": "http://localhost:8080"
@@ -43,6 +44,7 @@ npm run build
 ### Что нужно поменять в MyKHSU-web
 
 Файл `src/utils/constants.js` — убедитесь, что `API_BASE_URL` указывает на бэкенд:
+
 ```js
 export const API_BASE_URL = process.env.NODE_ENV === 'development'
   ? '/api'                   // CRA proxy → localhost:8080
@@ -75,7 +77,7 @@ cd admin-panel && npm install && npm run build
 ### Доступные экраны
 
 | Маршрут | Экран | Описание |
-|---|---|---|
+| --- | --- | --- |
 | `/admin-panel/` | — | Редирект на /dashboard |
 | `/admin-panel/login` | LoginScreen | Вход по логину и паролю |
 | `/admin-panel/dashboard` | DashboardScreen | Метрики: недели, курсы, дата обновления |
@@ -91,24 +93,44 @@ cd admin-panel && npm install && npm run build
 
 ### Темы
 
-Admin Panel поддерживает два режима: `light` и `dark`.  
-Переключатель — кнопка с иконкой луны/солнца в правом углу шапки.  
-Выбор сохраняется в `localStorage` (ключ `admin_theme`).
+Admin Panel теперь синхронизирована с визуальной системой мобильного MyKHSU и поддерживает темы:
+
+- `dark`
+- `light`
+- `matrix`
+- `legend`
+
+Текущая тема сохраняется в `localStorage` (ключ `admin_theme`), акцентный цвет — в `admin_accent`.
+
+### Акцентные цвета
+
+Доступны акценты, соответствующие мобильному приложению:
+
+- `green`
+- `blue`
+- `purple`
+- `orange`
+- `matrix`
+- `legend`
+
+Токены вынесены в `admin-panel/src/constants.js`.
 
 ### Дизайн
 
-Стилистика максимально близка к MyKHSU-web:
-- Glass-morphism карточки и сайдбар (`backdrop-filter: blur(40px)`)
-- Те же CSS-переменные (`--accent`, `--background`, `--surface-card`, ...)
-- Шрифт Montserrat
-- Акцентный цвет `#10B981` (зелёный)
-- Анимации: `cubic-bezier(0.34, 1.56, 0.64, 1)` (spring effect)
+Стилистика синхронизирована с React Native приложением MyKHSU:
+
+- токены `LIQUID_GLASS` и палитра акцентов перенесены в desktop-админку
+- используется фирменная бренд-марка из девяти плиток вместо условной буквы-логотипа
+- фон построен на тех же радиальных свечениях green/purple/blue, что и mobile-макеты
+- навигация и элементы управления оформлены как pill/glass-сегменты
+- темы `matrix` и `legend` повторяют специальные режимы мобильного приложения
+- build/version-метаданные выводятся в интерфейс через `GET /api/meta`
 
 ---
 
 ## Маршруты в Express
 
-```
+```text
 GET  /               → web-build/index.html (MyKHSU-web SPA)
 GET  /admin-panel/*  → admin-panel/build/index.html (Admin SPA)
 GET  /api/*          → Публичный API

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import BrandMark from '../components/BrandMark';
+import { ADMIN_UI } from '../constants';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -22,9 +24,9 @@ export default function LoginScreen() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo__icon">M</div>
-          <div className="login-logo__title">Мой ИТИ ХГУ</div>
-          <div className="login-logo__sub">Панель администратора</div>
+          <BrandMark className="login-logo__icon" />
+          <div className="login-logo__title">{ADMIN_UI.brandTitle}</div>
+          <div className="login-logo__sub">{ADMIN_UI.loginSubTitle}</div>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>

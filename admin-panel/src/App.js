@@ -8,7 +8,8 @@ import ScheduleScreen from './screens/ScheduleScreen';
 import NewsScreen from './screens/NewsScreen';
 import TimesScreen from './screens/TimesScreen';
 import UsersScreen from './screens/UsersScreen';
-import { ADMIN_UI } from './constants';
+import BrandMark from './components/BrandMark';
+import { ADMIN_ACCENT_COLORS, ADMIN_THEMES, ADMIN_UI } from './constants';
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: 'grid-outline',         label: 'Дашборд' },
@@ -28,7 +29,7 @@ const TITLES = {
 
 export default function App() {
   const { user, loading } = useAuth();
-  const { theme, toggle } = useTheme();
+  const { theme, accentColor, toggle, setTheme, setAccentColor } = useTheme();
   const location = useLocation();
 
   if (loading) {
@@ -49,10 +50,16 @@ export default function App() {
 
   return (
     <div className="admin-layout">
+      <div className="admin-layout__glow admin-layout__glow--primary" />
+      <div className="admin-layout__glow admin-layout__glow--secondary" />
+      <div className="admin-layout__noise" />
+
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <div className="sidebar__logo">{ADMIN_UI.logoText}</div>
+          <div className="sidebar__logo-wrap">
+            <BrandMark className="sidebar__logo" />
+          </div>
           <div className="sidebar__brand-text">
             <div className="sidebar__brand-title">{ADMIN_UI.brandTitle}</div>
             <div className="sidebar__brand-sub">{ADMIN_UI.brandSubTitle}</div>
@@ -87,11 +94,46 @@ export default function App() {
       {/* Main */}
       <div className="admin-main">
         <header className="admin-header">
-          <div className="admin-header__title">{title}</div>
+          <div className="admin-header__title-wrap">
+            <div className="admin-header__eyebrow">Control Center</div>
+            <div className="admin-header__title">{title}</div>
+          </div>
           <div className="admin-header__actions">
-            <button className="theme-toggle" onClick={toggle} title="Сменить тему">
-              <ion-icon name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} />
+            <div className="control-strip">
+              <div className="control-strip__label">Темы</div>
+              <div className="theme-pills">
+                {ADMIN_UI.themeOptions.map(themeKey => (
+                  <button
+                    key={themeKey}
+                    className={`theme-pill${theme === themeKey ? ' active' : ''}`}
+                    onClick={() => setTheme(themeKey)}
+                    title={ADMIN_THEMES[themeKey].label}
+                  >
+                    <ion-icon name={ADMIN_THEMES[themeKey].icon} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="control-strip">
+              <div className="control-strip__label">Акцент</div>
+              <div className="accent-palette">
+                {ADMIN_UI.accentOptions.map(accentKey => (
+                  <button
+                    key={accentKey}
+                    className={`accent-dot${accentColor === accentKey ? ' active' : ''}`}
+                    onClick={() => setAccentColor(accentKey)}
+                    title={ADMIN_ACCENT_COLORS[accentKey].label}
+                    style={{ '--dot-color': ADMIN_ACCENT_COLORS[accentKey].primary }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button className="theme-toggle" onClick={toggle} title="Переключить следующую тему">
+              <ion-icon name="color-wand-outline" />
             </button>
+            <div className="admin-header__meta-chip">{theme} / {accentColor}</div>
           </div>
         </header>
 

@@ -18,8 +18,7 @@ cp .env.example .env
 # JWT_SECRET=your-very-long-random-string-at-least-64-characters
 
 npm run seed               # Создать администраторов
-npm run build:admin        # Собрать Admin Panel
-npm run build:web          # Собрать MyKHSU-web (опционально)
+npm run build              # Собрать всё вместе (admin + web)
 npm start
 ```
 
@@ -58,6 +57,11 @@ sudo journalctl -u mykhsu -f
 ```
 
 ## Nginx (reverse proxy)
+
+На одном порту `8080` сервер отдаёт сразу:
+- `/api/*` и `/adminapi/*` (API)
+- `/admin-panel/*` (React Admin Panel)
+- `/` (MyKHSU-web)
 
 ```nginx
 server {
