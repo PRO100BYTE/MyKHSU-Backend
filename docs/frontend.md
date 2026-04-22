@@ -11,6 +11,14 @@
 
 Репозиторий: [PRO100BYTE/MyKHSU-web](https://github.com/PRO100BYTE/MyKHSU-web)
 
+В этом репозитории MyKHSU-web подключён как git submodule в папке `mykhsu-web/`.
+
+После клонирования backend-репозитория обязательно выполните:
+
+```bash
+git submodule update --init --recursive
+```
+
 ### Подключение
 
 ```bash
@@ -20,6 +28,8 @@ npm run build:web
 # Или вручную с указанием пути
 node scripts/build-frontend.js /path/to/MyKHSU-web
 ```
+
+По умолчанию скрипт использует сабмодуль `./mykhsu-web`.
 
 После сборки:
 

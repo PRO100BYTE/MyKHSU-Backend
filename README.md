@@ -18,6 +18,9 @@
 git clone <repo-url> MyKHSU-Backend
 cd MyKHSU-Backend
 
+# 1.1 Инициализировать фронтенд-сабмодуль
+git submodule update --init --recursive
+
 # 2. Установить зависимости
 npm install
 
@@ -71,6 +74,7 @@ MyKHSU-Backend/
 │   │   ├── context/        # AuthContext, ThemeContext
 │   │   └── screens/        # Dashboard, Schedule, News, Times
 │   └── public/
+├── mykhsu-web/             # Git submodule с исходниками MyKHSU-web
 ├── scripts/
 │   ├── create-admin.js     # Управление пользователями-администраторами
 │   └── build-frontend.js   # Единая сборка MyKHSU-web + admin-panel в web-build/
@@ -96,7 +100,7 @@ MyKHSU-Backend/
 | `JWT_SECRET` | — | **Обязательно.** Секрет для JWT (≥32 символов) |
 | `STATIC_PATH` | `./static` | Путь к статическим файлам (legacy) |
 | `DEBUG` | `false` | Включить отладочный вывод |
-| `WEB_SOURCE_PATH` | (автопоиск) | Путь к MyKHSU-web для build:web |
+| `WEB_SOURCE_PATH` | `./mykhsu-web` (автопоиск) | Путь к MyKHSU-web для build:web |
 | `SEED_ADMIN_PASSWORD` | (интерактивный ввод) | Пароль для admin при `npm run seed` |
 | `SEED_THEDAYG0NE_PASSWORD` | (интерактивный ввод) | Пароль для TheDayG0ne при `npm run seed` |
 

@@ -84,7 +84,7 @@
 
 ## Служебные скрипты и БД
 
-Скрипт `scripts/build-frontend.js` теперь собирает единый frontend bundle (`web-build/` + `web-build/admin-panel/`).
+Скрипт `scripts/build-frontend.js` теперь собирает единый frontend bundle (`web-build/` + `web-build/admin-panel/`) и использует `mykhsu-web/` (git submodule) как основной источник MyKHSU-web.
 
 Это изменение **не меняет схему БД** (`pairs.sqlite`, `users.sqlite`), но влияет на путь доступа к UI, через который выполняются административные операции с данными.
 
