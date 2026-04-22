@@ -50,6 +50,57 @@
 
 ---
 
+### Таблица `course_catalog`
+
+Ручной каталог курсов (для админского ручного ввода расписания).
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Уникальный идентификатор |
+| `course` | INTEGER NOT NULL UNIQUE | Номер курса |
+| `created_at` | TEXT | Дата создания записи |
+
+---
+
+### Таблица `group_catalog`
+
+Ручной каталог групп.
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Уникальный идентификатор |
+| `course` | INTEGER NOT NULL | Номер курса |
+| `group_name` | TEXT NOT NULL | Название группы |
+| `created_at` | TEXT | Дата создания записи |
+
+Ограничение уникальности: `(course, group_name)`.
+
+---
+
+### Таблица `unified_window_tickets`
+
+Обращения модуля «Единое окно».
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Идентификатор обращения |
+| `requester_role` | TEXT NOT NULL | Роль отправителя (`visitor`, `student`, `teacher`) |
+| `requester_name` | TEXT | Имя отправителя |
+| `requester_email` | TEXT | Email отправителя |
+| `subject` | TEXT NOT NULL | Тема обращения |
+| `message` | TEXT NOT NULL | Текст обращения |
+| `status` | TEXT NOT NULL DEFAULT `new` | Статус (`new`, `in_progress`, `resolved`, `closed`) |
+| `source` | TEXT NOT NULL DEFAULT `web` | Источник обращения |
+| `assignee` | TEXT | Ответственный администратор |
+| `response_text` | TEXT | Ответ заявителю |
+| `internal_note` | TEXT | Внутренняя заметка |
+| `created_at` | TEXT NOT NULL | Дата создания |
+| `updated_at` | TEXT NOT NULL | Дата последнего изменения |
+
+Индексы: `status`, `created_at`.
+
+---
+
 ## users.sqlite
 
 База данных администраторов.
@@ -62,6 +113,10 @@
 | `username` | TEXT NOT NULL UNIQUE | Логин (уникальный) |
 | `password` | TEXT NOT NULL | Хэш пароля (Argon2id) |
 | `is_active` | INTEGER NOT NULL DEFAULT 1 | Статус учётной записи (1=активен, 0=отключён) |
+| `first_name` | TEXT | Имя пользователя |
+| `last_name` | TEXT | Фамилия пользователя |
+| `position` | TEXT | Должность |
+| `email` | TEXT | Email для уведомлений/восстановления |
 | `created_at` | TEXT | Время создания пользователя |
 | `updated_at` | TEXT | Время последнего изменения |
 

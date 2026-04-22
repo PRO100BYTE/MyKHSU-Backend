@@ -50,7 +50,7 @@ function ManualTab() {
   const [catalogCourse, setCatalogCourse] = useState('');
   const [catalogGroupCourse, setCatalogGroupCourse] = useState('1');
   const [catalogGroupName, setCatalogGroupName] = useState('');
-  const [lessons, setLessons] = useState([{ time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+  const [lessons, setLessons] = useState([{ weekday: 'Понедельник', time: '', type: '', subject: '', teacher: '', auditory: '' }]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
 
@@ -59,7 +59,7 @@ function ManualTab() {
   };
 
   const addLesson = () => {
-    setLessons(prev => [...prev, { time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+    setLessons(prev => [...prev, { weekday: 'Понедельник', time: '', type: '', subject: '', teacher: '', auditory: '' }]);
   };
 
   const removeLesson = (index) => {
@@ -111,16 +111,38 @@ function ManualTab() {
     }
 
     setLoading(true);
-    const payload = {
-      group: group.trim(),
-      course: Number.parseInt(course, 10),
-      date,
-      week_number: Number.parseInt(weekNumber, 10),
-      weekday,
-      lessons: cleaned,
-    };
+    let resp;
+    if (mode === 'day') {
+      const payload = {
+        group: group.trim(),
+        course: Number.parseInt(course, 10),
+        date,
+        week_number: Number.parseInt(weekNumber, 10),
+        weekday,
+        lessons: cleaned.map(({ weekday: _ignored, ...rest }) => rest),
+      };
+      resp = await api.updatePairs(payload);
+    } else {
+      const dayOrder = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+      const grouped = dayOrder.map(day => ({
+        day,
+        lessons: cleaned.filter(l => (l.weekday || 'Понедельник') === day).map(({ weekday: _ignored, ...rest }) => rest),
+      })).filter(x => x.lessons.length > 0);
 
-    const resp = await api.updatePairs(payload);
+      for (const chunk of grouped) {
+        const payload = {
+          group: group.trim(),
+          course: Number.parseInt(course, 10),
+          date,
+          week_number: Number.parseInt(weekNumber, 10),
+          weekday: chunk.day,
+          lessons: chunk.lessons,
+        };
+        resp = await api.updatePairs(payload);
+        if (!resp?.ok) break;
+      }
+    }
+
     setLoading(false);
     if (!resp?.ok) {
       alert(resp?.data?.error || 'Не удалось сохранить расписание');
@@ -182,6 +204,7 @@ function ManualTab() {
             <table className="table">
               <thead>
                 <tr>
+                  {mode === 'week' ? <th>День</th> : null}
                   <th>Время</th>
                   <th>Тип</th>
                   <th>Предмет</th>
@@ -193,6 +216,13 @@ function ManualTab() {
               <tbody>
                 {lessons.map((row, i) => (
                   <tr key={i}>
+                    {mode === 'week' ? (
+                      <td>
+                        <select className="select" value={row.weekday || 'Понедельник'} onChange={e => updateLesson(i, 'weekday', e.target.value)}>
+                          {['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </td>
+                    ) : null}
                     <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30" /></td>
                     <td><input className="input" value={row.type} onChange={e => updateLesson(i, 'type', e.target.value)} placeholder="лекция" /></td>
                     <td><input className="input" value={row.subject} onChange={e => updateLesson(i, 'subject', e.target.value)} placeholder="Математика" /></td>

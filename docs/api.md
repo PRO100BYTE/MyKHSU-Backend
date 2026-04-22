@@ -120,7 +120,36 @@
 
 ### GET `/api/getcourses`
 
+Возвращает объединённый список курсов из `pairs` и ручного каталога `course_catalog`.
+
 **Ответ:** `[1, 2, 3, 4]`
+
+---
+
+### POST `/api/unified-window/tickets`
+
+Создать обращение в модуле «Единое окно» (доступно без авторизации).
+
+```json
+// Request
+{
+  "role": "student",
+  "name": "Иван Иванов",
+  "email": "ivan@example.com",
+  "subject": "Проблема с расписанием",
+  "message": "Не открывается расписание группы ИТ-21"
+}
+
+// Response
+{
+  "ok": true,
+  "id": 12,
+  "status": "new",
+  "tracking_code": "UW-000012"
+}
+```
+
+`role`: `visitor` | `student` | `teacher`
 
 ---
 
@@ -261,6 +290,50 @@
 
 ---
 
+### GET `/adminapi/profile`
+
+Профиль текущего администратора.
+
+```json
+{
+  "id": 1,
+  "username": "admin",
+  "first_name": "Иван",
+  "last_name": "Иванов",
+  "position": "Методист",
+  "email": "admin@khsu.ru",
+  "is_active": true,
+  "created_at": "2026-04-22 10:00:00",
+  "updated_at": "2026-04-22 10:00:00"
+}
+```
+
+---
+
+### PATCH `/adminapi/profile`
+
+Редактирование профиля текущего пользователя.
+
+```json
+// Request
+{
+  "username": "admin",
+  "first_name": "Иван",
+  "last_name": "Иванов",
+  "position": "Заведующий отделением",
+  "email": "admin@khsu.ru",
+  "current_password": "old-password",
+  "new_password": "new-strong-password"
+}
+
+// Response
+{ "ok": true }
+```
+
+`current_password` обязателен только при смене пароля.
+
+---
+
 ### GET `/adminapi/users`
 
 Список пользователей админ-панели.
@@ -329,6 +402,56 @@
 Удалить пользователя.
 
 **Response:** `{ "ok": true }`
+
+---
+
+### GET `/adminapi/catalog/courses`
+
+Список курсов ручного каталога.
+
+**Response:**
+```json
+[
+  { "id": 1, "course": 1, "created_at": "2026-04-22 10:00:00" }
+]
+```
+
+---
+
+### POST `/adminapi/catalog/courses`
+
+```json
+// Request
+{ "course": 2 }
+
+// Response
+{ "ok": true, "inserted": true }
+```
+
+---
+
+### GET `/adminapi/catalog/groups`
+
+**Query-параметры:** `course` (number, необязателен)
+
+**Response:**
+```json
+[
+  { "id": 1, "course": 2, "group_name": "ИТ-21", "created_at": "2026-04-22 10:00:00" }
+]
+```
+
+---
+
+### POST `/adminapi/catalog/groups`
+
+```json
+// Request
+{ "course": 2, "group_name": "ИТ-21" }
+
+// Response
+{ "ok": true, "inserted": true }
+```
 
 ---
 
@@ -405,6 +528,35 @@ CRUD для расписания звонков. Body — массив:
   { "id": 3, "method": "delete" }
 ]
 ```
+
+---
+
+### GET `/adminapi/unified-window/tickets`
+
+Получить обращения «Единого окна».
+
+**Query-параметры:** `status`, `role`, `limit` (по умолчанию `100`, максимум `500`)
+
+---
+
+### PATCH `/adminapi/unified-window/tickets/{id}`
+
+Обновление статуса и комментариев обращения.
+
+```json
+// Request
+{
+  "status": "in_progress",
+  "assignee": "admin",
+  "response_text": "Принято в работу",
+  "internal_note": "Проверить до конца дня"
+}
+
+// Response
+{ "ok": true }
+```
+
+`status`: `new` | `in_progress` | `resolved` | `closed`
 
 ---
 

@@ -119,8 +119,8 @@ export default function UnifiedWindowScreen() {
       ) : null}
 
       {selected ? (
-        <div className="modal" onClick={() => setSelected(null)}>
-          <div className="modal__panel" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setSelected(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
               <h3>Заявка #{selected.id}</h3>
             </div>
@@ -154,7 +154,7 @@ export default function UnifiedWindowScreen() {
             </div>
             <div className="modal__footer">
               <button className="btn" onClick={() => setSelected(null)}>Закрыть</button>
-              <button className="btn btn--primary" onClick={saveTicket}>Сохранить</button>
+              <button className="btn btn-primary" onClick={saveTicket}>Сохранить</button>
             </div>
           </div>
         </div>
