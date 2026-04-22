@@ -66,26 +66,23 @@ const api = {
   enableUser: (id) => request('POST', `/users/${id}/enable`),
   deleteUser: (id) => request('DELETE', `/users/${id}`),
 
-  // Профиль текущего пользователя
-  getProfile: () => request('GET', '/profile'),
-  updateProfile: (payload) => request('PATCH', '/profile', payload),
-
-  // Ручные каталоги курсов/групп
-  getCatalogCourses: () => request('GET', '/catalog/courses'),
-  createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
-  getCatalogGroups: (course) => request('GET', `/catalog/groups${course !== undefined ? `?course=${course}` : ''}`),
-  createCatalogGroup: (payload) => request('POST', '/catalog/groups', payload),
-
-  // Единое окно (тикеты)
-  getUnifiedWindowTickets: (params = {}) => {
-    const search = new URLSearchParams();
-    if (params.status) search.set('status', params.status);
-    if (params.role) search.set('role', params.role);
-    if (params.limit) search.set('limit', String(params.limit));
-    const suffix = search.toString();
-    return request('GET', `/unified-window/tickets${suffix ? `?${suffix}` : ''}`);
+  // Единое окно
+  getUwTickets: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
+    ).toString()
+    return request('GET', `/unified-window/tickets${qs ? '?' + qs : ''}`)
   },
-  updateUnifiedWindowTicket: (id, payload) => request('PATCH', `/unified-window/tickets/${id}`, payload),
+  getUwTicket: (id) => request('GET', `/unified-window/tickets/${id}`),
+  postUwMessage: (ticketId, text) => request('POST', `/unified-window/tickets/${ticketId}/messages`, { text }),
+  patchUwStatus: (ticketId, status, comment) => request('PATCH', `/unified-window/tickets/${ticketId}/status`, { status, comment }),
+  uploadUwAttachment: (ticketId, file, messageId) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (messageId) form.append('message_id', messageId)
+    return request('POST', `/unified-window/tickets/${ticketId}/attachments`, form, true)
+  },
+  getUwFileUrl: (fileId) => `/adminapi/unified-window/files/${fileId}`,
 
   // Публичный API (чтение)
   getGroups: (course) =>
