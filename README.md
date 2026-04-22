@@ -9,8 +9,7 @@
 | Сервер | Node.js 20+ / Express 4 |
 | База данных | SQLite (better-sqlite3) |
 | Аутентификация | JWT HS256 + Argon2id |
-| Фронтенд | [MyKHSU-web](https://github.com/PRO100BYTE/MyKHSU-web) (React) |
-| Админ-панель | React (в стилистике MyKHSU) |
+| Фронтенд | Единый bundle: [MyKHSU-web](https://github.com/PRO100BYTE/MyKHSU-web) + встроенная Admin Panel |
 
 ## Быстрый старт
 
@@ -29,10 +28,10 @@ cp .env.example .env
 # 4. Создать начальных администраторов (admin и TheDayG0ne)
 npm run seed
 
-# 5. Создать единый production-бандл (admin + web)
+# 5. Собрать единый frontend-бандл (web + admin-panel)
 npm run build
 
-# 6. Запустить сервер (на одном порту отдаёт API + admin-panel + web)
+# 6. Запустить сервер (на одном порту отдаёт API + единый фронтенд)
 npm start
 # или в режиме разработки с hot-reload:
 npm run dev
@@ -74,11 +73,11 @@ MyKHSU-Backend/
 │   └── public/
 ├── scripts/
 │   ├── create-admin.js     # Управление пользователями-администраторами
-│   └── build-frontend.js   # Сборка MyKHSU-web и копирование в web-build/
+│   └── build-frontend.js   # Единая сборка MyKHSU-web + admin-panel в web-build/
 ├── data/                   # SQLite базы данных (создаются автоматически)
 │   ├── pairs.sqlite        # Расписание, новости, звонки
 │   └── users.sqlite        # Пользователи-администраторы
-├── web-build/              # Собранный фронтенд MyKHSU-web (после build:web)
+├── web-build/              # Единый фронтенд-бандл (/, /admin-panel)
 ├── docs/                   # Полная документация проекта
 ├── .env.example            # Пример конфигурации
 ├── AGENTS.md               # Инструкции для AI-агентов (общие)
@@ -105,15 +104,15 @@ MyKHSU-Backend/
 
 | Команда | Описание |
 | --- | --- |
-| `npm start` | Единый запуск: предварительно собирает admin/web, затем стартует сервер |
+| `npm start` | Единый запуск: предварительно собирает объединенный frontend bundle, затем стартует сервер |
 | `npm run start:all` | Алиас единого запуска |
 | `npm run dev` | Запуск с автоперезагрузкой при изменениях |
 | `npm run build` | Единая сборка всего приложения |
-| `npm run build:all` | То же, что build (admin + web optional) |
+| `npm run build:all` | То же, что build (единый frontend bundle, web optional) |
 | `npm run seed` | Создание начальных администраторов (admin, TheDayG0ne) |
 | `npm run create-admin <user> <pass>` | Создать/обновить одного администратора |
-| `npm run build:admin` | Сборка React admin-панели |
-| `npm run build:web` | Сборка MyKHSU-web фронтенда |
+| `npm run build:admin` | Отдельная сборка React admin-панели (локально в admin-panel/build) |
+| `npm run build:web` | Сборка единого frontend bundle: MyKHSU-web + admin-panel в web-build |
 | `npm run users:list` | Показать пользователей админки |
 | `npm run users:create -- <username> <password> [active]` | Создать пользователя |
 | `npm run users:edit -- <id> [username] [password]` | Изменить логин и/или пароль |

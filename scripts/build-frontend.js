@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Скрипт сборки фронтенда MyKHSU-web и копирования в web-build/.
+ * Скрипт сборки объединенного фронтенда:
+ * 1) MyKHSU-web -> web-build/
+ * 2) admin-panel -> web-build/admin-panel/
  * 
  * Использование:
  *   node scripts/build-frontend.js [path/to/MyKHSU-web]
@@ -18,6 +20,8 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname ?? process.cwd(), '..');
 const DEST = path.join(ROOT, 'web-build');
+const ADMIN_SOURCE = path.join(ROOT, 'admin-panel');
+const ADMIN_DEST = path.join(DEST, 'admin-panel');
 
 function findWebSource() {
   const rawArgs = process.argv.slice(2).filter(arg => arg !== '--optional');
@@ -52,7 +56,7 @@ if (!webSource) {
   process.exit(1);
 }
 
-console.log(`[frontend] Источник: ${webSource}`);
+console.log(`[frontend] Источник MyKHSU-web: ${webSource}`);
 
 // Проверим что это CRA-проект с /api прокси
 const pkg = JSON.parse(fs.readFileSync(path.join(webSource, 'package.json'), 'utf-8'));
@@ -60,22 +64,49 @@ if (!pkg.proxy) {
   console.warn('[warn] В MyKHSU-web/package.json нет поля "proxy". Добавьте "proxy": "http://localhost:8080"');
 }
 
-// Собираем
-console.log('[frontend] Устанавливаем зависимости...');
+// Собираем основной фронтенд
+console.log('[frontend:web] Устанавливаем зависимости...');
 execSync('npm install', { cwd: webSource, stdio: 'inherit' });
 
-console.log('[frontend] Собираем...');
+console.log('[frontend:web] Собираем...');
 execSync('npm run build', { cwd: webSource, stdio: 'inherit', env: { ...process.env, PUBLIC_URL: '/' } });
 
 // Копируем build/ → web-build/
 const buildDir = path.join(webSource, 'build');
 if (!fs.existsSync(buildDir)) {
-  console.error('[error] Сборка не создала папку build/');
+  console.error('[error] MyKHSU-web не создал папку build/');
   process.exit(1);
 }
 
 if (fs.existsSync(DEST)) fs.rmSync(DEST, { recursive: true });
 fs.cpSync(buildDir, DEST, { recursive: true });
 
-console.log(`\n✓ Фронтенд скопирован в: ${DEST}`);
+// Собираем админ-панель и вкладываем в общий frontend bundle
+if (!fs.existsSync(path.join(ADMIN_SOURCE, 'package.json'))) {
+  console.error(`[error] Не найдена admin-panel: ${ADMIN_SOURCE}`);
+  process.exit(1);
+}
+
+console.log('[frontend:admin] Устанавливаем зависимости...');
+execSync('npm install', { cwd: ADMIN_SOURCE, stdio: 'inherit' });
+
+console.log('[frontend:admin] Собираем...');
+execSync('npm run build', {
+  cwd: ADMIN_SOURCE,
+  stdio: 'inherit',
+  env: { ...process.env, PUBLIC_URL: '/admin-panel' },
+});
+
+const adminBuildDir = path.join(ADMIN_SOURCE, 'build');
+if (!fs.existsSync(adminBuildDir)) {
+  console.error('[error] admin-panel не создал папку build/');
+  process.exit(1);
+}
+
+if (fs.existsSync(ADMIN_DEST)) fs.rmSync(ADMIN_DEST, { recursive: true });
+fs.cpSync(adminBuildDir, ADMIN_DEST, { recursive: true });
+
+console.log(`\n✓ Единый фронтенд собран в: ${DEST}`);
+console.log('  MyKHSU-web: /');
+console.log('  Admin panel: /admin-panel/');
 console.log('  Запустите сервер: npm start');

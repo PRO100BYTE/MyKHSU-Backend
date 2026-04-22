@@ -37,19 +37,6 @@ app.use('/adminapi', adminRouter);
 app.use('/admin',    adminRouter);
 
 // ---------------------------------------------------------------------------
-// Статика Admin Panel (React build)
-// Доступна по /admin-panel/*
-// ---------------------------------------------------------------------------
-const adminPanelBuild = path.join(ROOT, 'admin-panel', 'build');
-if (fs.existsSync(adminPanelBuild)) {
-  app.use('/admin-panel', express.static(adminPanelBuild));
-  // SPA fallback для admin-panel
-  app.get('/admin-panel/*', (_req, res) => {
-    res.sendFile(path.join(adminPanelBuild, 'index.html'));
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Статика основного фронтенда
 // ---------------------------------------------------------------------------
 const staticDir = path.isAbsolute(config.staticPath)
@@ -62,10 +49,23 @@ if (config.debug) {
 
 app.use('/static', express.static(staticDir));
 
-// Проверяем — есть ли сборка MyKHSU-web
+// Проверяем — есть ли единая сборка фронтенда
 const webBuildDir = path.join(ROOT, 'web-build');
 if (fs.existsSync(webBuildDir)) {
+  const mergedAdminBuild = path.join(webBuildDir, 'admin-panel');
+  const mergedAdminIndex = path.join(mergedAdminBuild, 'index.html');
+
   app.use(express.static(webBuildDir));
+
+  if (fs.existsSync(mergedAdminIndex)) {
+    // SPA fallback для admin-panel внутри общего web-build
+    app.get('/admin-panel/*', (_req, res) => {
+      res.sendFile(mergedAdminIndex, err => {
+        if (err) res.status(404).send('Not Found');
+      });
+    });
+  }
+
   app.get('*', (_req, res) => {
     res.sendFile(path.join(webBuildDir, 'index.html'), err => {
       if (err) res.status(404).send('Not Found');
@@ -95,10 +95,10 @@ app.use((err, _req, res, _next) => {
 // ---------------------------------------------------------------------------
 app.listen(config.port, config.host, () => {
   console.log(`[server] Listening on http://${config.host}:${config.port}`);
-  if (fs.existsSync(adminPanelBuild)) {
+  if (fs.existsSync(path.join(webBuildDir, 'admin-panel', 'index.html'))) {
     console.log(`[admin]  Panel: http://${config.host}:${config.port}/admin-panel/`);
   } else {
-    console.log('[admin]  Panel not built. Run: cd admin-panel && npm run build');
+    console.log('[admin]  Panel not built in unified bundle. Run: npm run build:web');
   }
 });
 

@@ -10,7 +10,7 @@
     "start:all": "npm start",
     "dev": "node --watch src/index.js",
     "build": "npm run build:all",
-    "build:all": "npm run build:admin && npm run build:web:optional",
+    "build:all": "npm run build:web:optional",
     "build:admin": "cd admin-panel && npm install && npm run build",
     "build:web": "node scripts/build-frontend.js",
     "build:web:optional": "node scripts/build-frontend.js --optional",
