@@ -319,7 +319,7 @@ router.patch('/users/:id', requireAuth, requirePermission('users:manage'), async
 // POST /adminapi/users/:id/disable
 // POST /adminapi/users/:id/enable
 // ---------------------------------------------------------------------------
-router.post('/users/:id/disable', requireAuth, (req, res) => {
+router.post('/users/:id/disable', requireAuth, requirePermission('users:manage'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid user id' });
   if (id === req.user.uid) return res.status(400).json({ error: 'You cannot disable your own account' });
