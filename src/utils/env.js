@@ -22,7 +22,9 @@ export function loadEnv() {
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    if (!(key in process.env)) {
+    const currentValue = process.env[key];
+    // Разрешаем .env заполнять пустые значения из окружения (например JWT_SECRET="")
+    if (!(key in process.env) || currentValue === undefined || currentValue === '') {
       process.env[key] = value;
     }
   }
