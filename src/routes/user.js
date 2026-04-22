@@ -1,15 +1,13 @@
 import { Router } from 'express';
-import { pairsDb } from '../db/database.js';
+import { pairsDb, usersDb } from '../db/database.js';
 import { getWeekDates, getCurrentWeekNumber, normalizeDate } from '../utils/dates.js';
 import { APP_CONSTANTS } from '../constants.js';
+import { encryptText, decryptText, createAccessToken } from '../utils/uw-crypto.js';
+import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const router = Router();
-
-function nowSql() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
-}
 
 // ---------------------------------------------------------------------------
 // GET /api/meta
@@ -153,19 +151,11 @@ router.get('/getgroups', (req, res) => {
   let rows;
   if (course !== undefined && course !== '') {
     rows = pairsDb.prepare(
-      `SELECT group_name FROM (
-         SELECT DISTINCT group_name FROM pairs WHERE course = ?
-         UNION
-         SELECT DISTINCT group_name FROM group_catalog WHERE course = ?
-       ) ORDER BY group_name`
-    ).all(parseInt(course, 10), parseInt(course, 10));
+      'SELECT DISTINCT group_name FROM pairs WHERE course = ? ORDER BY group_name'
+    ).all(parseInt(course, 10));
   } else {
     rows = pairsDb.prepare(
-      `SELECT group_name FROM (
-         SELECT DISTINCT group_name FROM pairs
-         UNION
-         SELECT DISTINCT group_name FROM group_catalog
-       ) ORDER BY group_name`
+      'SELECT DISTINCT group_name FROM pairs ORDER BY group_name'
     ).all();
   }
   res.json(rows.map(r => r.group_name));
@@ -186,50 +176,9 @@ router.get('/getgroups/:course', (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/getcourses', (_req, res) => {
   const rows = pairsDb.prepare(
-    `SELECT course FROM (
-       SELECT DISTINCT course FROM pairs
-       UNION
-       SELECT DISTINCT course FROM course_catalog
-     ) ORDER BY course`
+    'SELECT DISTINCT course FROM pairs ORDER BY course'
   ).all();
   res.json(rows.map(r => r.course));
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/unified-window/tickets
-// Body: { role, name, email, subject, message }
-// ---------------------------------------------------------------------------
-router.post('/unified-window/tickets', (req, res) => {
-  const role = String(req.body?.role ?? '').trim().toLowerCase();
-  const name = String(req.body?.name ?? '').trim();
-  const email = String(req.body?.email ?? '').trim();
-  const subject = String(req.body?.subject ?? '').trim();
-  const message = String(req.body?.message ?? '').trim();
-
-  const allowedRoles = new Set(['visitor', 'student', 'teacher']);
-  if (!allowedRoles.has(role)) {
-    return res.status(400).json({ error: 'role must be one of: visitor, student, teacher' });
-  }
-  if (!subject || !message) {
-    return res.status(400).json({ error: 'subject and message are required' });
-  }
-  if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-    return res.status(400).json({ error: 'email is invalid' });
-  }
-
-  const now = nowSql();
-  const result = pairsDb.prepare(
-    `INSERT INTO unified_window_tickets
-      (requester_role, requester_name, requester_email, subject, message, status, source, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'new', 'web', ?, ?)`
-  ).run(role, name || null, email || null, subject, message, now, now);
-
-  res.json({
-    ok: true,
-    id: result.lastInsertRowid,
-    status: 'new',
-    tracking_code: `UW-${String(result.lastInsertRowid).padStart(6, '0')}`,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -386,3 +335,112 @@ function groupByWeekday(rows) {
 }
 
 export default router;
+
+// ---------------------------------------------------------------------------
+// Единое окно — публичные эндпоинты (без авторизации)
+// ---------------------------------------------------------------------------
+
+function uwNowSql() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function uwDueAt(priority) {
+  const hoursMap = { urgent: 4, high: 24, normal: 72, low: 168 }
+  const hours = hoursMap[priority] ?? 72
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+// POST /api/unified-window/tickets — создать обращение
+router.post('/unified-window/tickets', (req, res) => {
+  const { subject, contact_email, contact_name, message, priority } = req.body ?? {}
+
+  if (!subject || !String(subject).trim()) {
+    return res.status(400).json({ error: 'subject is required' })
+  }
+  if (!message || !String(message).trim()) {
+    return res.status(400).json({ error: 'message is required' })
+  }
+
+  const validPriorities = ['low', 'normal', 'high', 'urgent']
+  const safePriority = validPriorities.includes(priority) ? priority : 'normal'
+  const accessToken = createAccessToken()
+  const now = uwNowSql()
+  const dueAt = uwDueAt(safePriority)
+
+  const ticketResult = usersDb.prepare(
+    `INSERT INTO unified_window_tickets (subject, contact_email, contact_name, status, priority, access_token, due_at, created_at, updated_at)
+     VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)`
+  ).run(
+    String(subject).trim(),
+    contact_email ?? null,
+    contact_name ?? null,
+    safePriority, accessToken, dueAt, now, now
+  )
+
+  const ticketId = ticketResult.lastInsertRowid
+
+  // Сохранить первое сообщение зашифрованным
+  const encrypted = encryptText(String(message).trim())
+  usersDb.prepare(
+    `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
+     VALUES (?, 'user', ?, ?, ?, ?, ?)`
+  ).run(ticketId, contact_name ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
+
+  // Email-подтверждение создания тикета
+  if (contact_email) {
+    sendUnifiedWindowEmail({
+      to: contact_email,
+      subject: `Обращение #${ticketId} принято`,
+      text: `Ваше обращение "${subject}" зарегистрировано.\nНомер обращения: ${ticketId}\nТокен для слежения: ${accessToken}`,
+    }).catch(() => {})
+  }
+
+  res.status(201).json({ ok: true, id: ticketId, access_token: accessToken })
+})
+
+// GET /api/unified-window/tickets/:token — получить статус по токену
+router.get('/unified-window/tickets/:token', (req, res) => {
+  const { token } = req.params
+  if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
+
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+
+  res.json({
+    id: ticket.id,
+    subject: ticket.subject,
+    status: ticket.status,
+    priority: ticket.priority,
+    due_at: ticket.due_at,
+    created_at: ticket.created_at,
+    updated_at: ticket.updated_at,
+  })
+})
+
+// POST /api/unified-window/tickets/:token/reply — пользователь добавляет сообщение
+router.post('/unified-window/tickets/:token/reply', (req, res) => {
+  const { token } = req.params
+  if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
+
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+  if (ticket.status === 'closed') return res.status(400).json({ error: 'Ticket is closed' })
+
+  const { message, contact_name } = req.body ?? {}
+  if (!message || !String(message).trim()) return res.status(400).json({ error: 'message is required' })
+
+  const encrypted = encryptText(String(message).trim())
+  const now = uwNowSql()
+
+  const result = usersDb.prepare(
+    `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
+     VALUES (?, 'user', ?, ?, ?, ?, ?)`
+  ).run(ticket.id, contact_name ?? ticket.contact_name ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
+
+  // Переоткрыть тикет если был resolved
+  if (ticket.status === 'resolved') {
+    usersDb.prepare("UPDATE unified_window_tickets SET status = 'open', updated_at = ? WHERE id = ?").run(now, ticket.id)
+  }
+
+  res.json({ ok: true, id: result.lastInsertRowid })
+})

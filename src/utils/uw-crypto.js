@@ -1,64 +1,84 @@
-import crypto from 'node:crypto'
-import { config } from '../config.js'
+/**
+ * AES-256-GCM шифрование/дешифрование для данных Единого окна.
+ * Ключ берётся из UW_ENCRYPTION_KEY окружения (минимум 16 символов).
+ */
 
-function getKey() {
-  // Используем SHA-256 от фразы для стабильного 32-байтного ключа.
-  return crypto.createHash('sha256').update(config.unifiedWindowEncryptionKey).digest()
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+
+function getDerivedKey() {
+  const raw = process.env.UW_ENCRYPTION_KEY ?? ''
+  if (!raw || raw.length < 16) {
+    throw new Error('UW_ENCRYPTION_KEY must be set and at least 16 characters long')
+  }
+  // SHA-256 от ключа → 32 байта для AES-256
+  return createHash('sha256').update(raw).digest()
 }
 
-function b64(input) {
-  return Buffer.from(input).toString('base64')
-}
-
-function fromB64(input) {
-  return Buffer.from(input, 'base64')
-}
-
+/**
+ * Шифрует строку.
+ * @param {string} plainText
+ * @returns {{ iv: string, tag: string, data: string }} Base64-строки
+ */
 export function encryptText(plainText) {
-  if (!plainText) return null
-  const iv = crypto.randomBytes(12)
-  const key = getKey()
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
-  const encrypted = Buffer.concat([cipher.update(String(plainText), 'utf8'), cipher.final()])
+  const key = getDerivedKey()
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', key, iv)
+  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
-
   return {
-    iv: b64(iv),
-    tag: b64(tag),
-    data: b64(encrypted),
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64'),
   }
 }
 
-export function decryptText(payload) {
-  if (!payload || !payload.iv || !payload.tag || !payload.data) return ''
-  const key = getKey()
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, fromB64(payload.iv))
-  decipher.setAuthTag(fromB64(payload.tag))
-  const decrypted = Buffer.concat([decipher.update(fromB64(payload.data)), decipher.final()])
+/**
+ * Дешифрует строку.
+ * @param {{ iv: string, tag: string, data: string }} payload
+ * @returns {string}
+ */
+export function decryptText({ iv, tag, data }) {
+  const key = getDerivedKey()
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'))
+  decipher.setAuthTag(Buffer.from(tag, 'base64'))
+  const decrypted = Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()])
   return decrypted.toString('utf8')
 }
 
+/**
+ * Шифрует бинарный буфер (файл).
+ * @param {Buffer} buffer
+ * @returns {{ iv: string, tag: string, data: string }} Base64-строки
+ */
 export function encryptBuffer(buffer) {
-  const iv = crypto.randomBytes(12)
-  const key = getKey()
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  const key = getDerivedKey()
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', key, iv)
   const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()])
   const tag = cipher.getAuthTag()
-
   return {
-    iv: b64(iv),
-    tag: b64(tag),
-    data: b64(encrypted),
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64'),
   }
 }
 
-export function decryptBuffer(payload) {
-  const key = getKey()
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, fromB64(payload.iv))
-  decipher.setAuthTag(fromB64(payload.tag))
-  return Buffer.concat([decipher.update(fromB64(payload.data)), decipher.final()])
+/**
+ * Дешифрует бинарный буфер (файл).
+ * @param {{ iv: string, tag: string, data: string }} payload
+ * @returns {Buffer}
+ */
+export function decryptBuffer({ iv, tag, data }) {
+  const key = getDerivedKey()
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'))
+  decipher.setAuthTag(Buffer.from(tag, 'base64'))
+  return Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()])
 }
 
+/**
+ * Генерирует случайный токен доступа для пользователя ЕО (48 hex символов).
+ * @returns {string}
+ */
 export function createAccessToken() {
-  return crypto.randomBytes(24).toString('hex')
+  return randomBytes(24).toString('hex')
 }

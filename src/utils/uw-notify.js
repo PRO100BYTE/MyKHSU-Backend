@@ -1,51 +1,56 @@
-import { config } from '../config.js'
+/**
+ * Email-уведомления для Единого окна.
+ * Использует nodemailer (опционально). Если SMTP не настроен — молча пропускает.
+ */
 
-let transporterPromise = null
+let transporter = null
+let transporterReady = false
 
 async function getTransporter() {
-  if (transporterPromise) return transporterPromise
+  if (transporterReady) return transporter
 
-  transporterPromise = (async () => {
-    if (!config.smtpHost || !config.smtpUser || !config.smtpPass || !config.smtpFrom) {
-      return null
-    }
+  const host = process.env.SMTP_HOST
+  const user = process.env.SMTP_USER
+  const pass = process.env.SMTP_PASS
 
-    try {
-      const nodemailer = await import('nodemailer')
-      return nodemailer.createTransport({
-        host: config.smtpHost,
-        port: config.smtpPort,
-        secure: config.smtpSecure,
-        auth: {
-          user: config.smtpUser,
-          pass: config.smtpPass,
-        },
-      })
-    } catch {
-      return null
-    }
-  })()
-
-  return transporterPromise
-}
-
-export async function sendUnifiedWindowEmail({ to, subject, text }) {
-  if (!to) return { sent: false, reason: 'no-recipient' }
-
-  const transporter = await getTransporter()
-  if (!transporter) {
-    return { sent: false, reason: 'smtp-not-configured' }
+  if (!host || !user || !pass) {
+    transporterReady = true
+    return null
   }
 
   try {
-    await transporter.sendMail({
-      from: config.smtpFrom,
-      to,
-      subject,
-      text,
+    const nodemailer = await import('nodemailer')
+    transporter = nodemailer.default.createTransport({
+      host,
+      port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user, pass },
     })
-    return { sent: true }
-  } catch (error) {
-    return { sent: false, reason: error?.message || 'send-failed' }
+    transporterReady = true
+  } catch {
+    transporterReady = true
+    transporter = null
+  }
+
+  return transporter
+}
+
+/**
+ * Отправляет email-уведомление по тикету ЕО.
+ * @param {{ to: string, subject: string, text: string, html?: string }} opts
+ */
+export async function sendUnifiedWindowEmail({ to, subject, text, html }) {
+  if (!to) return
+
+  const t = await getTransporter()
+  if (!t) return
+
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
+
+  try {
+    await t.sendMail({ from, to, subject, text, html: html ?? text })
+  } catch (err) {
+    // Не прерываем основной поток из-за ошибки почты
+    console.error('[uw-notify] Failed to send email:', err.message)
   }
 }
