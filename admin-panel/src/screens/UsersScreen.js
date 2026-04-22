@@ -6,6 +6,15 @@ const EMPTY_FORM = {
   username: '',
   password: '',
   is_active: true,
+  role: 'admin',
+};
+
+const ROLE_LABELS = {
+  admin: 'Админ',
+  schedule_dispatcher: 'Диспетчер расписания',
+  news_editor: 'Редактор новостей',
+  manager: 'Менеджер',
+  unified_window_agent: 'Агент единого окна',
 };
 
 export default function UsersScreen() {
@@ -54,6 +63,7 @@ export default function UsersScreen() {
       username: target.username,
       password: '',
       is_active: Boolean(target.is_active),
+      role: target.role ?? 'admin',
     });
     setIsModalOpen(true);
     setError('');
@@ -73,6 +83,7 @@ export default function UsersScreen() {
     const payload = {
       username: form.username.trim(),
       is_active: Boolean(form.is_active),
+      role: form.role,
     };
 
     if (!editTarget || form.password.trim()) {
@@ -170,6 +181,7 @@ export default function UsersScreen() {
                 <thead>
                   <tr>
                     <th>Логин</th>
+                    <th>Роль</th>
                     <th>Статус</th>
                     <th>Создан</th>
                     <th>Обновлен</th>
@@ -182,6 +194,11 @@ export default function UsersScreen() {
                     return (
                       <tr key={item.id}>
                         <td className="table-cell-strong">{item.username}</td>
+                        <td>
+                          <span className="badge badge-blue">
+                            {ROLE_LABELS[item.role] ?? item.role ?? 'admin'}
+                          </span>
+                        </td>
                         <td>
                           <span className={`badge ${item.is_active ? 'badge-green' : 'badge-gray'}`}>
                             {item.is_active ? 'Активен' : 'Отключен'}
@@ -270,6 +287,19 @@ export default function UsersScreen() {
                   onChange={e => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
                 />
               </label>
+
+              <div className="form-group">
+                <label className="form-label">Роль</label>
+                <select
+                  className="form-input"
+                  value={form.role}
+                  onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
+                >
+                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="modal__footer">
                 <button type="button" className="btn btn-ghost" onClick={closeModal} disabled={saving}>Отмена</button>
