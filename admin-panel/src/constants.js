@@ -80,7 +80,7 @@ export const ADMIN_THEMES = {
 
 export const ADMIN_UI = {
   brandTitle: 'Мой ИТИ ХГУ',
-  brandSubTitle: 'Администрирование',
+  brandSubTitle: 'Панель управления',
   loginSubTitle: 'Панель управления расписанием, новостями и пользователями',
   accentOptions: ['green', 'blue', 'purple', 'orange', 'matrix', 'legend'],
   themeOptions: ['dark', 'light', 'matrix', 'legend'],

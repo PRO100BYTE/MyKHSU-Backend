@@ -358,6 +358,9 @@ html, body, #root {
 .sidebar__footer {
   padding: 16px;
   border-top: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .sidebar__user {
   display: flex;
@@ -417,6 +420,11 @@ html, body, #root {
   cursor: pointer;
 }
 
+.sidebar__user-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sidebar__user-trigger ion-icon {
   color: var(--text-tertiary);
   margin-left: auto;
@@ -437,8 +445,7 @@ html, body, #root {
   box-shadow: 0 14px 32px var(--shadow-color);
 }
 
-.sidebar__user-menu:hover .profile-menu,
-.sidebar__user-menu:focus-within .profile-menu {
+.profile-menu--open {
   display: flex;
 }
 
@@ -1556,21 +1563,25 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 100%;
+  min-height: 36px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--surface-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.18s ease;
-  flex-shrink: 0;
-  margin-left: auto;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.sidebar__collapse-btn--footer {
+  justify-content: center;
 }
 
 .sidebar--collapsed .sidebar__collapse-btn {
-  margin-left: 0;
-  margin-top: 6px;
+  width: 100%;
 }
 
 .sidebar__collapse-btn:hover {
@@ -1595,6 +1606,7 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   background: var(--surface-card);
   border: 0.5px solid var(--border-strong);
   border-radius: 28px;
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   box-shadow: 0 16px 40px var(--shadow-color);
 }
