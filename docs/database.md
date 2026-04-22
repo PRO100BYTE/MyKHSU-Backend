@@ -75,6 +75,13 @@
 
 Ограничение уникальности: `(course, group_name)`.
 
+Индексы: `group_catalog(course)`, `group_catalog(group_name)`.
+
+При старте сервера выполняется синхронизация каталогов:
+
+- в `course_catalog` добавляются отсутствующие значения `course` из `pairs`;
+- в `group_catalog` добавляются отсутствующие пары `(course, group_name)` из `pairs`.
+
 ---
 
 ### Таблица `unified_window_tickets`
@@ -101,6 +108,8 @@
 | `updated_at` | TEXT NOT NULL | Дата последнего изменения |
 
 Индексы: `status`, `priority`, `access_token`, `contact_email_hash`.
+
+Для старых БД колонка `contact_email_hash` и индекс на ней добавляются миграцией при старте сервера.
 
 ---
 
