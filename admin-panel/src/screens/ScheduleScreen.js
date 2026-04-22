@@ -1,11 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
+
+const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+const EMPTY_LESSON = {
+  weekday: 'Понедельник',
+  time: '',
+  type: '',
+  subject: '',
+  teacher: '',
+  auditory: '',
+};
 
 export default function ScheduleScreen() {
   const [tab, setTab] = useState('upload');
 
   return (
-          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
     <div className="screen-stack">
       <div className="screen-hero">
         <div className="screen-hero__icon">
@@ -13,29 +23,30 @@ export default function ScheduleScreen() {
         </div>
         <div>
           <div className="screen-hero__title">Расписание</div>
-          <div className="screen-hero__sub">Импорт, обновление и очистка таблицы занятий</div>
+          <div className="screen-hero__sub">Импорт JSON, ручной ввод на день/неделю и очистка таблицы занятий</div>
         </div>
       </div>
 
       <div className="segmented">
         {[
-          { id: 'upload', label: 'Загрузить', icon: 'cloud-upload-outline' },
+          { id: 'upload', label: 'Загрузка', icon: 'cloud-upload-outline' },
+          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
           { id: 'delete', label: 'Очистить', icon: 'trash-outline' },
-        ].map(t => (
+        ].map(item => (
           <button
-            key={t.id}
-            className={`segmented__item${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
+            key={item.id}
+            className={`segmented__item${tab === item.id ? ' active' : ''}`}
+            onClick={() => setTab(item.id)}
           >
-            <ion-icon name={t.icon} />
-            {t.label}
+            <ion-icon name={item.icon} />
+            {item.label}
           </button>
         ))}
       </div>
 
-      {tab === 'upload' && <UploadTab />}
-      {tab === 'manual' && <ManualTab />}
-      {tab === 'delete' && <DeleteTab />}
+      {tab === 'upload' ? <UploadTab /> : null}
+      {tab === 'manual' ? <ManualTab /> : null}
+      {tab === 'delete' ? <DeleteTab /> : null}
     </div>
   );
 }
@@ -50,16 +61,66 @@ function ManualTab() {
   const [catalogCourse, setCatalogCourse] = useState('');
   const [catalogGroupCourse, setCatalogGroupCourse] = useState('1');
   const [catalogGroupName, setCatalogGroupName] = useState('');
-  const [lessons, setLessons] = useState([{ weekday: 'Понедельник', time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+  const [lessons, setLessons] = useState([EMPTY_LESSON]);
+  const [courses, setCourses] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const coursesResp = await api.getCourses();
+      const fetchedCourses = Array.isArray(coursesResp) ? coursesResp : [];
+      if (!mounted) return;
+
+      const normalized = fetchedCourses
+        .map(item => parseInt(item, 10))
+        .filter(item => !Number.isNaN(item))
+        .sort((a, b) => a - b);
+
+      setCourses(normalized);
+      if (normalized.length && !normalized.includes(parseInt(course, 10))) {
+        setCourse(String(normalized[0]));
+      }
+    })();
+    return () => { mounted = false; };
+  }, [course]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const selectedCourse = parseInt(course, 10);
+      if (Number.isNaN(selectedCourse)) {
+        setGroups([]);
+        return;
+      }
+
+      const groupsResp = await api.getGroups(selectedCourse);
+      const fetchedGroups = Array.isArray(groupsResp) ? groupsResp : [];
+      if (!mounted) return;
+
+      setGroups(fetchedGroups);
+      if (fetchedGroups.length && !fetchedGroups.includes(group)) {
+        setGroup(fetchedGroups[0]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [course, group]);
+
+  const groupedWeekRows = useMemo(() => {
+    return WEEKDAYS.map(day => ({
+      day,
+      rows: lessons.filter(item => (item.weekday || 'Понедельник') === day),
+    })).filter(chunk => chunk.rows.length > 0);
+  }, [lessons]);
 
   const updateLesson = (index, field, value) => {
     setLessons(prev => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
   const addLesson = () => {
-    setLessons(prev => [...prev, { weekday: 'Понедельник', time: '', type: '', subject: '', teacher: '', auditory: '' }]);
+    setLessons(prev => [...prev, EMPTY_LESSON]);
   };
 
   const removeLesson = (index) => {
@@ -78,7 +139,16 @@ function ManualTab() {
       return;
     }
     setCatalogCourse('');
-    setNotice('Курс добавлен в каталог');
+    setNotice(resp.data?.inserted ? 'Курс добавлен в каталог' : 'Курс уже существует в каталоге');
+
+    const coursesResp = await api.getCourses();
+    const fetchedCourses = Array.isArray(coursesResp) ? coursesResp : [];
+    setCourses(
+      fetchedCourses
+        .map(item => parseInt(item, 10))
+        .filter(item => !Number.isNaN(item))
+        .sort((a, b) => a - b)
+    );
   };
 
   const createCatalogGroup = async () => {
@@ -92,7 +162,14 @@ function ManualTab() {
       return;
     }
     setCatalogGroupName('');
-    setNotice('Группа добавлена в каталог');
+    setNotice(resp.data?.inserted ? 'Группа добавлена в каталог' : 'Группа уже существует в каталоге');
+
+    const selectedCourse = parseInt(course, 10);
+    if (!Number.isNaN(selectedCourse)) {
+      const groupsResp = await api.getGroups(selectedCourse);
+      const fetchedGroups = Array.isArray(groupsResp) ? groupsResp : [];
+      setGroups(fetchedGroups);
+    }
   };
 
   const submitManual = async () => {
@@ -102,8 +179,8 @@ function ManualTab() {
     }
 
     const cleaned = lessons
-      .map((l) => ({ ...l, method: 'create' }))
-      .filter((l) => l.time || l.subject || l.teacher || l.auditory || l.type);
+      .map((item) => ({ ...item, method: 'create' }))
+      .filter((item) => item.time || item.subject || item.teacher || item.auditory || item.type);
 
     if (!cleaned.length) {
       alert('Добавьте хотя бы одну строку пары');
@@ -112,31 +189,45 @@ function ManualTab() {
 
     setLoading(true);
     let resp;
+    const parsedCourse = parseInt(course, 10);
+    const parsedWeek = parseInt(weekNumber, 10);
+    if (Number.isNaN(parsedCourse)) {
+      setLoading(false);
+      alert('Курс должен быть числом');
+      return;
+    }
+    if (Number.isNaN(parsedWeek)) {
+      setLoading(false);
+      alert('Номер недели должен быть числом');
+      return;
+    }
+
     if (mode === 'day') {
       const payload = {
         group: group.trim(),
-        course: Number.parseInt(course, 10),
+        course: parsedCourse,
         date,
-        week_number: Number.parseInt(weekNumber, 10),
+        week_number: parsedWeek,
         weekday,
-        lessons: cleaned.map(({ weekday: _ignored, ...rest }) => rest),
+        lessons: cleaned.map(({ weekday: ignoredWeekday, ...rest }) => rest),
       };
       resp = await api.updatePairs(payload);
     } else {
-      const dayOrder = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-      const grouped = dayOrder.map(day => ({
-        day,
-        lessons: cleaned.filter(l => (l.weekday || 'Понедельник') === day).map(({ weekday: _ignored, ...rest }) => rest),
-      })).filter(x => x.lessons.length > 0);
+      for (const chunk of groupedWeekRows) {
+        const filteredLessons = chunk.rows
+          .map(item => ({ ...item, method: 'create' }))
+          .filter(item => item.time || item.subject || item.teacher || item.auditory || item.type)
+          .map(({ weekday: ignoredWeekday, ...rest }) => rest)
 
-      for (const chunk of grouped) {
+        if (!filteredLessons.length) continue
+
         const payload = {
           group: group.trim(),
-          course: Number.parseInt(course, 10),
+          course: parsedCourse,
           date,
-          week_number: Number.parseInt(weekNumber, 10),
+          week_number: parsedWeek,
           weekday: chunk.day,
-          lessons: chunk.lessons,
+          lessons: filteredLessons,
         };
         resp = await api.updatePairs(payload);
         if (!resp?.ok) break;
@@ -184,8 +275,16 @@ function ManualTab() {
 
         <div className="table-wrap" style={{ padding: 12 }}>
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))' }}>
-            <input className="input" placeholder="Курс" value={course} onChange={e => setCourse(e.target.value)} />
-            <input className="input" placeholder="Группа" value={group} onChange={e => setGroup(e.target.value)} />
+            <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
+              {!courses.length ? <option value="">Нет курсов</option> : null}
+              {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select className="select" value={group} onChange={e => setGroup(e.target.value)} style={{ width: '100%' }}>
+                {!groups.length ? <option value="">Нет групп</option> : null}
+                {groups.map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
             <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
             <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <select className="select" value={mode} onChange={e => setMode(e.target.value)}>
@@ -194,9 +293,11 @@ function ManualTab() {
             </select>
           </div>
 
+          <input className="input" placeholder="Или введите группу вручную" value={group} onChange={e => setGroup(e.target.value)} style={{ marginTop: 10 }} />
+
           {mode === 'day' ? (
             <select className="select" style={{ marginTop: 10, maxWidth: 220 }} value={weekday} onChange={e => setWeekday(e.target.value)}>
-              {['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].map(d => <option key={d} value={d}>{d}</option>)}
+              {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           ) : null}
 
@@ -219,11 +320,11 @@ function ManualTab() {
                     {mode === 'week' ? (
                       <td>
                         <select className="select" value={row.weekday || 'Понедельник'} onChange={e => updateLesson(i, 'weekday', e.target.value)}>
-                          {['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].map(d => <option key={d} value={d}>{d}</option>)}
+                          {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </td>
                     ) : null}
-                    <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30" /></td>
+                    <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30 или id" /></td>
                     <td><input className="input" value={row.type} onChange={e => updateLesson(i, 'type', e.target.value)} placeholder="лекция" /></td>
                     <td><input className="input" value={row.subject} onChange={e => updateLesson(i, 'subject', e.target.value)} placeholder="Математика" /></td>
                     <td><input className="input" value={row.teacher} onChange={e => updateLesson(i, 'teacher', e.target.value)} placeholder="Иванов И.И." /></td>
@@ -283,7 +384,7 @@ function UploadTab() {
       <div className="card__header">
         <div>
           <div className="card__title">Загрузка расписания</div>
-          <div className="card__subtitle">JSON-файл в формате ХГСУ</div>
+          <div className="card__subtitle">JSON-файл в формате ХГУ</div>
         </div>
       </div>
       <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
