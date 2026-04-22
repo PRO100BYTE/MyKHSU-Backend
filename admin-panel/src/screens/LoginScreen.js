@@ -7,6 +7,7 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -24,6 +25,9 @@ export default function LoginScreen() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-logo">
+          <div className="login-logo__badge" aria-hidden="true">
+            <ion-icon name="shield-checkmark-outline" />
+          </div>
           <BrandMark className="login-logo__icon" />
           <div className="login-logo__title">{ADMIN_UI.brandTitle}</div>
           <div className="login-logo__sub">{ADMIN_UI.loginSubTitle}</div>
@@ -34,28 +38,44 @@ export default function LoginScreen() {
 
           <div className="form-group">
             <label className="form-label">Логин</label>
-            <input
-              className="form-input"
-              type="text"
-              autoComplete="username"
-              placeholder="admin"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              disabled={loading}
-            />
+            <div className="input-with-icon">
+              <ion-icon className="input-icon" name="person-outline" aria-hidden="true" />
+              <input
+                className="form-input input-with-icon__control"
+                type="text"
+                autoComplete="username"
+                placeholder="admin"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                disabled={loading}
+              />
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label">Пароль</label>
-            <input
-              className="form-input"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={loading}
-            />
+            <div className="input-with-icon">
+              <ion-icon className="input-icon" name="lock-closed-outline" aria-hidden="true" />
+              <input
+                className="form-input input-with-icon__control input-with-icon__control--password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="input-toggle"
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                onClick={() => setShowPassword(v => !v)}
+                disabled={loading}
+              >
+                <ion-icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} />
+              </button>
+            </div>
           </div>
 
           <button

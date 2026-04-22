@@ -60,10 +60,10 @@ if (!webSource) {
 
 console.log(`[frontend] Источник MyKHSU-web: ${webSource}`);
 
-// Проверим что это CRA-проект с /api прокси
+// Для production-сборки proxy не требуется. Это нужно только для локального npm start в mykhsu-web.
 const pkg = JSON.parse(fs.readFileSync(path.join(webSource, 'package.json'), 'utf-8'));
 if (!pkg.proxy) {
-  console.warn('[warn] В MyKHSU-web/package.json нет поля "proxy". Добавьте "proxy": "http://localhost:8080"');
+  console.log('[info] В MyKHSU-web/package.json нет поля "proxy". Для production-сборки это нормально.');
 }
 
 // Собираем основной фронтенд

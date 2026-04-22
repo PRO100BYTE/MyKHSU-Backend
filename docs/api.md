@@ -244,6 +244,9 @@
 
 // Response 403
 { "error": "User is disabled" }
+
+// Response 503
+{ "error": "Admin users are not configured. Run: npm run seed or npm run users:create -- <username> <password> true" }
 ```
 
 Токен действителен **24 часа**.

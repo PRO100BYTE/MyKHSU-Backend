@@ -1262,6 +1262,18 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   gap: 14px;
   text-align: center;
 }
+.login-logo__badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--accent-glass-border);
+  background: linear-gradient(180deg, var(--accent-glass), transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 22px;
+}
 .login-logo__icon {
   width: 72px;
   height: 72px;
@@ -1283,6 +1295,54 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-tertiary);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.input-with-icon__control {
+  padding-left: 40px;
+}
+
+.input-with-icon__control--password {
+  padding-right: 44px;
+}
+
+.input-toggle {
+  position: absolute;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.input-toggle:hover {
+  background: var(--accent-glass);
+  color: var(--accent);
+}
+
+.input-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ===== Empty State ===== */

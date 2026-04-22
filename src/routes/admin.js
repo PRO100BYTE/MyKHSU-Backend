@@ -27,6 +27,13 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'username and password are required' });
   }
 
+  const usersCount = usersDb.prepare('SELECT COUNT(*) AS count FROM users').get()?.count ?? 0;
+  if (!usersCount) {
+    return res.status(503).json({
+      error: 'Admin users are not configured. Run: npm run seed or npm run users:create -- <username> <password> true',
+    });
+  }
+
   const user = usersDb.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
