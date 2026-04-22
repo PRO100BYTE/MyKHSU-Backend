@@ -31,6 +31,7 @@ export default function ScheduleScreen() {
         {[
           { id: 'upload', label: 'Загрузка', icon: 'cloud-upload-outline' },
           { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
+          { id: 'edit', label: 'Редактирование', icon: 'pencil-outline' },
           { id: 'delete', label: 'Очистить', icon: 'trash-outline' },
         ].map(item => (
           <button
@@ -46,6 +47,7 @@ export default function ScheduleScreen() {
 
       {tab === 'upload' ? <UploadTab /> : null}
       {tab === 'manual' ? <ManualTab /> : null}
+      {tab === 'edit' ? <EditTab /> : null}
       {tab === 'delete' ? <DeleteTab /> : null}
     </div>
   );
@@ -345,6 +347,255 @@ function ManualTab() {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EditTab() {
+  const [course, setCourse] = useState('1');
+  const [group, setGroup] = useState('');
+  const [weekNumber, setWeekNumber] = useState('1');
+  const [pairs, setPairs] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingData, setEditingData] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const coursesResp = await api.getCourses();
+      const fetchedCourses = Array.isArray(coursesResp) ? coursesResp : [];
+      if (!mounted) return;
+
+      const normalized = fetchedCourses
+        .map(item => parseInt(item, 10))
+        .filter(item => !Number.isNaN(item))
+        .sort((a, b) => a - b);
+
+      setCourses(normalized);
+      if (normalized.length && !normalized.includes(parseInt(course, 10))) {
+        setCourse(String(normalized[0]));
+      }
+    })();
+    return () => { mounted = false; };
+  }, [course]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const selectedCourse = parseInt(course, 10);
+      if (Number.isNaN(selectedCourse)) {
+        setGroups([]);
+        return;
+      }
+
+      const groupsResp = await api.getGroups(selectedCourse);
+      const fetchedGroups = Array.isArray(groupsResp) ? groupsResp : [];
+      if (!mounted) return;
+
+      setGroups(fetchedGroups);
+      if (fetchedGroups.length && !fetchedGroups.includes(group)) {
+        setGroup(fetchedGroups[0]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [course, group]);
+
+  const loadPairs = async () => {
+    if (!group) {
+      setNotice('Выберите группу');
+      return;
+    }
+    setLoading(true);
+    const resp = await api.getPairs({ group, course: parseInt(course, 10), week_number: parseInt(weekNumber, 10) });
+    setLoading(false);
+    if (Array.isArray(resp)) {
+      setPairs(resp);
+      setNotice('');
+    } else {
+      setNotice('Не удалось загрузить пары');
+    }
+  };
+
+  const savePair = async (pairId) => {
+    if (!editingData) return;
+    setSaving(true);
+    const resp = await api.updatePair(pairId, editingData);
+    setSaving(false);
+    if (resp?.ok) {
+      setPairs(prev => prev.map(p => p.id === pairId ? { ...p, ...editingData } : p));
+      setEditingId(null);
+      setEditingData(null);
+      setNotice('Пара обновлена');
+    } else {
+      setNotice(resp?.data?.error || 'Ошибка сохранения');
+    }
+  };
+
+  const deletePair = async (pairId) => {
+    if (!window.confirm('Вы уверены?')) return;
+    setSaving(true);
+    const resp = await api.deletePair(pairId);
+    setSaving(false);
+    if (resp?.ok) {
+      setPairs(prev => prev.filter(p => p.id !== pairId));
+      setNotice('Пара удалена');
+    } else {
+      setNotice(resp?.data?.error || 'Ошибка удаления');
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Редактирование пар</div>
+          <div className="card__subtitle">Редактирование, удаление существующих пар</div>
+        </div>
+      </div>
+      <div className="card__body" style={{ display: 'grid', gap: 14 }}>
+        {notice ? (
+          <div className={`alert ${notice.includes('ошибка') ? 'alert-error' : 'alert-success'}`}>
+            <ion-icon name={notice.includes('ошибка') ? 'alert-circle-outline' : 'checkmark-circle-outline'} />
+            {notice}
+          </div>
+        ) : null}
+
+        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
+            {!courses.length ? <option value="">Нет курсов</option> : null}
+            {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
+          </select>
+          <select className="select" value={group} onChange={e => setGroup(e.target.value)}>
+            {!groups.length ? <option value="">Нет групп</option> : null}
+            {groups.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
+          <button className="btn btn-primary" onClick={loadPairs} disabled={loading || !group}>
+            {loading ? 'Загрузка...' : '载загрузить'}
+          </button>
+        </div>
+
+        {pairs.length > 0 && (
+          <div className="table-wrap" style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th>День</th>
+                  <th>Время</th>
+                  <th>Тип</th>
+                  <th>Предмет</th>
+                  <th>Преподаватель</th>
+                  <th>Аудитория</th>
+                  <th style={{ width: 140 }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pairs.map(p => (
+                  <tr key={p.id} style={{ opacity: editingId === p.id ? 0.7 : 1 }}>
+                    <td>{WEEKDAYS[p.weekday - 1] || p.weekday}</td>
+                    <td>
+                      {editingId === p.id ? (
+                        <input
+                          className="input"
+                          value={editingData?.time ?? p.time}
+                          onChange={e => setEditingData(prev => ({ ...prev, time: e.target.value }))}
+                          style={{ fontSize: 12 }}
+                        />
+                      ) : (
+                        `${p.time_start} - ${p.time_end}`
+                      )}
+                    </td>
+                    <td>
+                      {editingId === p.id ? (
+                        <input
+                          className="input"
+                          value={editingData?.type ?? p.type}
+                          onChange={e => setEditingData(prev => ({ ...prev, type: e.target.value }))}
+                          style={{ fontSize: 12 }}
+                        />
+                      ) : (
+                        p.type
+                      )}
+                    </td>
+                    <td>
+                      {editingId === p.id ? (
+                        <input
+                          className="input"
+                          value={editingData?.subject ?? p.subject}
+                          onChange={e => setEditingData(prev => ({ ...prev, subject: e.target.value }))}
+                          style={{ fontSize: 12 }}
+                        />
+                      ) : (
+                        p.subject
+                      )}
+                    </td>
+                    <td>
+                      {editingId === p.id ? (
+                        <input
+                          className="input"
+                          value={editingData?.teacher ?? p.teacher}
+                          onChange={e => setEditingData(prev => ({ ...prev, teacher: e.target.value }))}
+                          style={{ fontSize: 12 }}
+                        />
+                      ) : (
+                        p.teacher
+                      )}
+                    </td>
+                    <td>
+                      {editingId === p.id ? (
+                        <input
+                          className="input"
+                          value={editingData?.auditory ?? p.auditory}
+                          onChange={e => setEditingData(prev => ({ ...prev, auditory: e.target.value }))}
+                          style={{ fontSize: 12 }}
+                        />
+                      ) : (
+                        p.auditory
+                      )}
+                    </td>
+                    <td>
+                      {editingId === p.id ? (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="btn btn-sm" onClick={() => savePair(p.id)} disabled={saving}>
+                            Сохр.
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setEditingId(null); setEditingData(null); }}>
+                            Отм.
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              setEditingId(p.id);
+                              setEditingData(p);
+                            }}
+                          >
+                            Ред.
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: '#ef4444' }}
+                            onClick={() => deletePair(p.id)}
+                          >
+                            Удал.
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

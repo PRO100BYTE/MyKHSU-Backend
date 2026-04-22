@@ -49,6 +49,12 @@ const api = {
     return request('POST', replace ? '/createtable' : '/updatetable', fd, true);
   },
   updatePairs: (payload) => request('POST', '/updatepairs', payload),
+  getPairs: (params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))).toString();
+    return request('GET', `/pairs${qs ? '?' + qs : ''}`);
+  },
+  updatePair: (id, payload) => request('PUT', `/pairs/${id}`, payload),
+  deletePair: (id) => request('DELETE', `/pairs/${id}`),
   getCatalogCourses: () => request('GET', '/catalog/courses'),
   createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
   getCatalogGroups: (course) => request('GET', `/catalog/groups${course !== undefined && course !== '' ? `?course=${course}` : ''}`),

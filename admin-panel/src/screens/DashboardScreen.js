@@ -5,6 +5,7 @@ import { BUILD_INFO_FALLBACK } from '../constants';
 export default function DashboardScreen() {
   const [stats, setStats] = useState(null);
   const [meta, setMeta] = useState(null);
+  const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,9 +15,11 @@ export default function DashboardScreen() {
       api.getWeekNumbers(),
       api.getNews(1, 0),
       api.getMeta(),
-    ]).then(([lastUpdate, courses, weeks, news, metaInfo]) => {
+      api.getUwTickets({ limit: 5, status: 'open' }),
+    ]).then(([lastUpdate, courses, weeks, news, metaInfo, uwTickets]) => {
       setStats({ lastUpdate, courses, weeks, news });
       setMeta(metaInfo);
+      setTickets(Array.isArray(uwTickets) ? uwTickets : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -71,6 +74,45 @@ export default function DashboardScreen() {
           <QuickAction icon="trash-outline" label="Очистить расписание" danger href="/admin-panel/schedule/delete" />
         </div>
       </div>
+
+      {/* Unified Window Tickets */}
+      {tickets.length > 0 && (
+        <div className="card">
+          <div className="card__header">
+            <div>
+              <div className="card__title">Обращения Единого окна</div>
+              <div className="card__subtitle">Последние открытые обращения</div>
+            </div>
+          </div>
+          <div className="card__body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {tickets.map(t => (
+                <div key={t.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: 10,
+                  background: 'var(--surface-secondary)', borderRadius: 8, fontSize: 13
+                }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%', 
+                    background: t.priority === 'urgent' ? '#ef4444' : t.priority === 'high' ? '#f59e0b' : '#10b981'
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500 }}>{t.subject}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      {t.contact_name} • {new Date(t.created_at).toLocaleString('ru-RU')}
+                    </div>
+                  </div>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                    background: 'var(--accent-glass)', color: 'var(--accent)'
+                  }}>
+                    {t.status === 'open' ? 'Открыто' : t.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Info */}
       <div className="card">

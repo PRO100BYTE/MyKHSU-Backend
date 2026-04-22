@@ -603,6 +603,63 @@ router.post('/updatetable', requireAuth, requirePermission('schedule:write'), up
 // Body: { group, course, date, week_number, weekday, lessons: [...] }
 // lesson.method: "create"|"update"|"delete"|"pass"
 // ---------------------------------------------------------------------------
+// GET /adminapi/pairs — получить пары по фильтрам (для редактирования)
+router.get('/pairs', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const query = (req.query.group || '').trim()
+  const course = parseInt(req.query.course, 10)
+  const weekNumber = parseInt(req.query.week_number, 10)
+
+  let sql = 'SELECT p.*, t.time_start, t.time_end FROM pairs p LEFT JOIN times t ON p.time = t.id WHERE 1=1'
+  const params = []
+
+  if (query) {
+    sql += ' AND p.group_name = ?'
+    params.push(query)
+  }
+  if (!Number.isNaN(course)) {
+    sql += ' AND p.course = ?'
+    params.push(course)
+  }
+  if (!Number.isNaN(weekNumber)) {
+    sql += ' AND p.week_number = ?'
+    params.push(weekNumber)
+  }
+
+  sql += ' ORDER BY p.weekday, p.time'
+  const rows = pairsDb.prepare(sql).all(...params)
+  res.json(rows)
+})
+
+// PUT /adminapi/pairs/:id — обновить пару
+router.put('/pairs/:id', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const pairsId = parseInt(req.params.id, 10)
+  if (Number.isNaN(pairsId)) return res.status(400).json({ error: 'Invalid pair ID' })
+
+  const { weekday, course, group_name, date, week_number, time, type, subject, teacher, auditory } = req.body
+
+  const existing = pairsDb.prepare('SELECT * FROM pairs WHERE id = ?').get(pairsId)
+  if (!existing) return res.status(404).json({ error: 'Pair not found' })
+
+  pairsDb.prepare(
+    `UPDATE pairs SET weekday=?, course=?, group_name=?, date=?, week_number=?, time=?, type=?, subject=?, teacher=?, auditory=?
+     WHERE id = ?`
+  ).run(weekday, course, group_name, date, week_number, time, type, subject, teacher, auditory, pairsId)
+
+  res.json({ ok: true })
+})
+
+// DELETE /adminapi/pairs/:id — удалить пару
+router.delete('/pairs/:id', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const pairsId = parseInt(req.params.id, 10)
+  if (Number.isNaN(pairsId)) return res.status(400).json({ error: 'Invalid pair ID' })
+
+  const existing = pairsDb.prepare('SELECT * FROM pairs WHERE id = ?').get(pairsId)
+  if (!existing) return res.status(404).json({ error: 'Pair not found' })
+
+  pairsDb.prepare('DELETE FROM pairs WHERE id = ?').run(pairsId)
+  res.json({ ok: true })
+})
+
 router.post('/updatepairs', requireAuth, requirePermission('schedule:write'), (req, res) => {
   const { group, course, date, week_number, weekday, lessons } = req.body ?? {};
 
@@ -762,20 +819,42 @@ function updateLastUpdate() {
 // ---------------------------------------------------------------------------
 
 // GET /adminapi/unified-window/tickets
+// GET /adminapi/unified-window/tickets — список всех тикетов с фильтрацией
 router.get('/unified-window/tickets', requireAuth, requirePermission('unified_window:read'), (req, res) => {
-  const { status, priority } = req.query
-  let sql = `SELECT * FROM unified_window_tickets`
+  const status = (req.query.status || '').trim()
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0)
+
+  let sql = 'SELECT * FROM unified_window_tickets WHERE 1=1'
   const params = []
 
-  const conditions = []
-  if (status) { conditions.push('status = ?'); params.push(status) }
-  if (priority) { conditions.push('priority = ?'); params.push(priority) }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ')
-  sql += ' ORDER BY created_at DESC'
+  if (status && ['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+    sql += ' AND status = ?'
+    params.push(status)
+  }
 
-  const tickets = usersDb.prepare(sql).all(...params)
-  res.json(tickets.map(mapTicket))
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  params.push(limit, offset)
+
+  const rows = usersDb.prepare(sql).all(...params)
+
+  // Расшифровываем поля
+  const tickets = rows.map(t => ({
+    id: t.id,
+    subject: decryptTicketField(t, 'subject'),
+    status: t.status,
+    priority: t.priority,
+    contact_name: decryptTicketField(t, 'contact_name'),
+    contact_email: decryptTicketField(t, 'contact_email'),
+    access_token: t.access_token,
+    created_at: t.created_at,
+    updated_at: t.updated_at,
+  }))
+
+  res.json(tickets)
 })
+
+
 
 // GET /adminapi/unified-window/tickets/:id
 router.get('/unified-window/tickets/:id', requireAuth, requirePermission('unified_window:read'), (req, res) => {
