@@ -134,8 +134,8 @@
 // Request
 {
   "role": "student",
-  "name": "Иван Иванов",
-  "email": "ivan@example.com",
+  "contact_name": "Иван Иванов",
+  "contact_email": "ivan@example.com",
   "subject": "Проблема с расписанием",
   "message": "Не открывается расписание группы ИТ-21"
 }
@@ -144,12 +144,71 @@
 {
   "ok": true,
   "id": 12,
-  "status": "new",
-  "tracking_code": "UW-000012"
+  "access_token": "a1b2c3d4..."
 }
 ```
 
 `role`: `visitor` | `student` | `teacher`
+
+Данные обращения хранятся в БД `users.sqlite` в таблицах `unified_window_tickets` / `unified_window_messages`. Сообщения и чувствительные поля обращения шифруются (AES-256-GCM).
+
+---
+
+### GET `/api/unified-window/tickets`
+
+История обращений по email (из БД).
+
+**Query-параметры:**
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| `contact_email` | string | ✓ | Email, указанный при создании обращения |
+
+**Ответ:**
+
+```json
+[
+  {
+    "id": 12,
+    "access_token": "a1b2c3d4...",
+    "subject": "Проблема с расписанием",
+    "status": "open",
+    "priority": "normal",
+    "contact_name": "Иван Иванов",
+    "created_at": "2026-04-22 10:00:00",
+    "updated_at": "2026-04-22 10:00:00"
+  }
+]
+```
+
+---
+
+### GET `/api/unified-window/tickets/{token}`
+
+Статус и метаданные обращения по `access_token`.
+
+---
+
+### GET `/api/unified-window/tickets/{token}/messages`
+
+История сообщений обращения по `access_token`.
+
+---
+
+### POST `/api/unified-window/tickets/{token}/reply`
+
+Добавить сообщение пользователя в существующее обращение.
+
+```json
+// Request
+{
+  "message": "Есть обновление по проблеме",
+  "contact_name": "Иван Иванов"
+}
+
+// Response
+{ "ok": true, "id": 101 }
+```
 
 ---
 
@@ -345,6 +404,11 @@
     "id": 1,
     "username": "admin",
     "is_active": true,
+    "role": "admin",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "position": "Методист",
+    "email": "admin@khsu.ru",
     "created_at": "2026-04-22 10:00:00",
     "updated_at": "2026-04-22 10:00:00"
   }
@@ -359,7 +423,16 @@
 
 ```json
 // Request
-{ "username": "newadmin", "password": "very-strong-password", "is_active": true }
+{
+  "username": "newadmin",
+  "password": "very-strong-password",
+  "is_active": true,
+  "role": "manager",
+  "first_name": "Иван",
+  "last_name": "Иванов",
+  "position": "Методист",
+  "email": "ivan@khsu.ru"
+}
 
 // Response
 { "ok": true, "id": 5 }
@@ -373,7 +446,16 @@
 
 ```json
 // Request
-{ "username": "admin2", "password": "new-password", "is_active": true }
+{
+  "username": "admin2",
+  "password": "new-password",
+  "is_active": true,
+  "role": "news_editor",
+  "first_name": "Петр",
+  "last_name": "Петров",
+  "position": "Редактор",
+  "email": "petrov@khsu.ru"
+}
 
 // Response
 { "ok": true }
