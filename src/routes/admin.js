@@ -106,6 +106,74 @@ function normalizeEmail(value) {
   return email ? email.toLowerCase() : null
 }
 
+const WEEKDAY_NAME_TO_NUM = {
+  'понедельник': 1,
+  'вторник': 2,
+  'среда': 3,
+  'четверг': 4,
+  'пятница': 5,
+  'суббота': 6,
+  'воскресенье': 7,
+}
+
+function normalizeWeekday(value) {
+  if (value === undefined || value === null || value === '') return null
+  if (typeof value === 'number') {
+    if (value >= 1 && value <= 7) return value
+    return null
+  }
+  const str = String(value).trim()
+  if (!str) return null
+  if (/^\d+$/.test(str)) {
+    const num = parseInt(str, 10)
+    return num >= 1 && num <= 7 ? num : null
+  }
+  return WEEKDAY_NAME_TO_NUM[str.toLowerCase()] ?? null
+}
+
+function parseTimeRange(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+
+  const range = raw.match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/)
+  if (range) {
+    return { time_start: range[1], time_end: range[2] }
+  }
+
+  const single = raw.match(/^(\d{1,2}:\d{2})$/)
+  if (single) {
+    return { time_start: single[1], time_end: single[1] }
+  }
+
+  return null
+}
+
+function resolveTimeId(rawTime) {
+  if (rawTime === undefined || rawTime === null || rawTime === '') return null
+
+  if (typeof rawTime === 'number' || /^\d+$/.test(String(rawTime).trim())) {
+    const id = parseInt(rawTime, 10)
+    if (Number.isNaN(id)) return null
+    const exists = pairsDb.prepare('SELECT id FROM times WHERE id = ?').get(id)
+    return exists ? id : null
+  }
+
+  const range = parseTimeRange(rawTime)
+  if (!range) return null
+
+  const existing = pairsDb
+    .prepare('SELECT id FROM times WHERE time_start = ? AND time_end = ?')
+    .get(range.time_start, range.time_end)
+  if (existing) return existing.id
+
+  const maxRow = pairsDb.prepare('SELECT COALESCE(MAX(time), 0) AS max_time FROM times').get()
+  const nextTime = (maxRow?.max_time ?? 0) + 1
+  const inserted = pairsDb
+    .prepare('INSERT INTO times (time, time_start, time_end) VALUES (?, ?, ?)')
+    .run(nextTime, range.time_start, range.time_end)
+  return Number(inserted.lastInsertRowid)
+}
+
 // ---------------------------------------------------------------------------
 // POST /adminapi/login  (также /admin/login)
 // Body: { username, password }
@@ -415,6 +483,66 @@ router.delete('/users/:id', requireAuth, requirePermission('users:manage'), (req
 });
 
 // ---------------------------------------------------------------------------
+// Каталог курсов/групп для ручного ввода расписания
+// ---------------------------------------------------------------------------
+router.get('/catalog/courses', requireAuth, requirePermission('schedule:write'), (_req, res) => {
+  const rows = pairsDb
+    .prepare('SELECT id, course, created_at FROM course_catalog ORDER BY course')
+    .all()
+  res.json(rows)
+})
+
+router.post('/catalog/courses', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const course = parseInt(req.body?.course, 10)
+  if (Number.isNaN(course) || course < -1 || course > 10) {
+    return res.status(400).json({ error: 'course must be an integer between -1 and 10' })
+  }
+
+  const now = nowSql()
+  const result = pairsDb
+    .prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) VALUES (?, ?)')
+    .run(course, now)
+  res.json({ ok: true, inserted: result.changes > 0 })
+})
+
+router.get('/catalog/groups', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const courseFilter = req.query?.course
+  if (courseFilter !== undefined && courseFilter !== '') {
+    const course = parseInt(courseFilter, 10)
+    if (Number.isNaN(course)) return res.status(400).json({ error: 'Invalid course' })
+    const rows = pairsDb
+      .prepare('SELECT id, course, group_name, created_at FROM group_catalog WHERE course = ? ORDER BY group_name COLLATE NOCASE')
+      .all(course)
+    return res.json(rows)
+  }
+
+  const rows = pairsDb
+    .prepare('SELECT id, course, group_name, created_at FROM group_catalog ORDER BY course, group_name COLLATE NOCASE')
+    .all()
+  res.json(rows)
+})
+
+router.post('/catalog/groups', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const course = parseInt(req.body?.course, 10)
+  const groupName = normalizeNullableText(req.body?.group_name, 120)
+
+  if (Number.isNaN(course) || course < -1 || course > 10) {
+    return res.status(400).json({ error: 'course must be an integer between -1 and 10' })
+  }
+  if (!groupName) {
+    return res.status(400).json({ error: 'group_name is required' })
+  }
+
+  const now = nowSql()
+  pairsDb.prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) VALUES (?, ?)').run(course, now)
+  const result = pairsDb
+    .prepare('INSERT OR IGNORE INTO group_catalog (course, group_name, created_at) VALUES (?, ?, ?)')
+    .run(course, groupName, now)
+
+  res.json({ ok: true, inserted: result.changes > 0 })
+})
+
+// ---------------------------------------------------------------------------
 // DELETE /adminapi/deletetable
 // ---------------------------------------------------------------------------
 router.delete('/deletetable', requireAuth, requirePermission('schedule:write'), (_req, res) => {
@@ -482,30 +610,47 @@ router.post('/updatepairs', requireAuth, requirePermission('schedule:write'), (r
     return res.status(400).json({ error: 'group and lessons[] are required' });
   }
 
-  const normalDate = normalizeDate(date ?? '');
+  const normalizedCourse = Number.isNaN(parseInt(course, 10)) ? null : parseInt(course, 10)
+  const normalizedWeekday = normalizeWeekday(weekday)
+  if (weekday !== undefined && weekday !== null && weekday !== '' && normalizedWeekday === null) {
+    return res.status(400).json({ error: 'weekday must be 1..7 or weekday name' })
+  }
+
+  const normalDate = normalizeDate(date ?? '') || null;
   const insert = pairsDb.prepare(
     `INSERT INTO pairs (week_number, weekday, course, group_name, date, time, type, subject, teacher, auditory, date_start, date_end)
      VALUES (@week_number, @weekday, @course, @group_name, @date, @time, @type, @subject, @teacher, @auditory, @date_start, @date_end)`
   );
   const update = pairsDb.prepare(
-    `UPDATE pairs SET type=@type, subject=@subject, teacher=@teacher, auditory=@auditory WHERE id=@id`
+    `UPDATE pairs SET type=@type, subject=@subject, teacher=@teacher, auditory=@auditory, time=@time WHERE id=@id`
   );
   const del = pairsDb.prepare('DELETE FROM pairs WHERE id=?');
 
   const run = pairsDb.transaction(() => {
+    if (normalizedCourse !== null) {
+      pairsDb.prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) VALUES (?, ?)').run(normalizedCourse, nowSql())
+      pairsDb.prepare('INSERT OR IGNORE INTO group_catalog (course, group_name, created_at) VALUES (?, ?, ?)').run(normalizedCourse, String(group).trim(), nowSql())
+    }
+
     for (const lesson of lessons) {
+      const timeId = resolveTimeId(lesson.time)
+
       switch (lesson.method) {
         case 'create':
           insert.run({
-            week_number, weekday, course, group_name: group,
-            date: normalDate, time: lesson.time ?? null,
+            week_number: week_number ?? null,
+            weekday: normalizedWeekday,
+            course: normalizedCourse,
+            group_name: String(group).trim(),
+            date: normalDate,
+            time: timeId,
             type: lesson.type ?? null, subject: lesson.subject ?? null,
             teacher: lesson.teacher ?? null, auditory: lesson.auditory ?? null,
             date_start: null, date_end: null,
           });
           break;
         case 'update':
-          update.run({ id: lesson.id, type: lesson.type, subject: lesson.subject, teacher: lesson.teacher, auditory: lesson.auditory });
+          update.run({ id: lesson.id, type: lesson.type, subject: lesson.subject, teacher: lesson.teacher, auditory: lesson.auditory, time: timeId });
           break;
         case 'delete':
           del.run(lesson.id);
