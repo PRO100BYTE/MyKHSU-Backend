@@ -9,7 +9,8 @@
  * 
  * Если путь не указан — ищет папку автоматически:
  *   1. Переменная WEB_SOURCE_PATH из .env
- *   2. Соседняя папка ../../PRO100BYTE/MyKHSU-web
+ *   2. Сабмодуль ./mykhsu-web
+ *   3. Соседняя папка ../../PRO100BYTE/MyKHSU-web
  */
 import { loadEnv } from '../src/utils/env.js';
 loadEnv();
@@ -33,6 +34,7 @@ function findWebSource() {
 
   // Автопоиск
   const candidates = [
+    path.join(ROOT, 'mykhsu-web'),
     path.join(ROOT, '..', 'PRO100BYTE', 'MyKHSU-web'),
     path.join(ROOT, '..', 'MyKHSU-web'),
   ];
