@@ -7,14 +7,51 @@ import { requireAuth } from '../middleware/auth.js';
 import { config } from '../config.js';
 import { importTimetable } from '../parsers/timetable.js';
 import { normalizeDate } from '../utils/dates.js';
+import { AVAILABLE_ROLES, hasPermission } from '../utils/permissions.js';
+import { createAccessToken, decryptBuffer, decryptText, encryptBuffer, encryptText } from '../utils/uw-crypto.js';
+import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const uploadUnifiedAttachment = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 function nowSql() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (hasPermission(req.user?.role, permission)) {
+      return next();
+    }
+    return res.status(403).json({ error: `Forbidden: missing permission ${permission}` });
+  };
+}
+
+function mapTicket(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    tracking_code: `UW-${String(row.id).padStart(6, '0')}`,
+  };
+}
+
+function getDueAtByPriority(priority) {
+  const now = new Date();
+  const due = new Date(now);
+  if (priority === 'critical') due.setHours(due.getHours() + 2);
+  else if (priority === 'high') due.setHours(due.getHours() + 8);
+  else if (priority === 'low') due.setDate(due.getDate() + 3);
+  else due.setDate(due.getDate() + 1);
+  return due.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function recordStatusHistory(ticketId, oldStatus, newStatus, changedBy, note = null) {
+  pairsDb.prepare(
+    'INSERT INTO unified_window_status_history (ticket_id, old_status, new_status, changed_by, note, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(ticketId, oldStatus, newStatus, changedBy, note, nowSql());
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +92,7 @@ router.post('/login', async (req, res) => {
     { algorithm: 'HS256', expiresIn: '24h' }
   );
 
-  res.json({ token });
+  res.json({ token, role: user.role || 'admin' });
 });
 
 // ---------------------------------------------------------------------------
