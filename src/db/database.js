@@ -57,6 +57,20 @@ function initPairsSchema(db) {
       last_change TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS course_catalog (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      course     INTEGER NOT NULL UNIQUE,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS group_catalog (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      course     INTEGER NOT NULL,
+      group_name TEXT    NOT NULL,
+      created_at TEXT,
+      UNIQUE(course, group_name)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pairs_week_number ON pairs(week_number);
     CREATE INDEX IF NOT EXISTS idx_pairs_date        ON pairs(date);
     CREATE INDEX IF NOT EXISTS idx_pairs_date_start  ON pairs(date_start);
@@ -66,7 +80,23 @@ function initPairsSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_pairs_teacher     ON pairs(teacher);
     CREATE INDEX IF NOT EXISTS idx_pairs_auditory    ON pairs(auditory);
     CREATE INDEX IF NOT EXISTS idx_pairs_subject     ON pairs(subject);
+    CREATE INDEX IF NOT EXISTS idx_group_catalog_course ON group_catalog(course);
+    CREATE INDEX IF NOT EXISTS idx_group_catalog_name   ON group_catalog(group_name);
   `);
+
+  const pairColumns = db.prepare('PRAGMA table_info(pairs)').all().map(c => c.name);
+  if (!pairColumns.includes('date')) {
+    db.exec('ALTER TABLE pairs ADD COLUMN date TEXT');
+  }
+
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  db.prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) SELECT DISTINCT course, ? FROM pairs WHERE course IS NOT NULL').run(now);
+  db.prepare(
+    `INSERT OR IGNORE INTO group_catalog (course, group_name, created_at)
+     SELECT DISTINCT course, group_name, ?
+     FROM pairs
+     WHERE course IS NOT NULL AND group_name IS NOT NULL AND TRIM(group_name) != ''`
+  ).run(now);
 }
 
 function initUsersSchema(db) {
@@ -147,7 +177,6 @@ function initUsersSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_status       ON unified_window_tickets(status);
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_priority     ON unified_window_tickets(priority);
     CREATE INDEX IF NOT EXISTS idx_uw_tickets_access_token ON unified_window_tickets(access_token);
-    CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash);
     CREATE INDEX IF NOT EXISTS idx_uw_messages_ticket_id   ON unified_window_messages(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_uw_files_ticket_id      ON unified_window_files(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_uw_history_ticket_id    ON unified_window_status_history(ticket_id);
