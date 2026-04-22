@@ -1,0 +1,39 @@
+{
+  "name": "mykhsu-backend",
+  "version": "1.0.0",
+  "description": "MyKHSU Schedule Backend — Node.js rewrite",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "prestart": "npm run build:all",
+    "start": "node src/index.js",
+    "start:all": "npm start",
+    "dev": "node --watch src/index.js",
+    "build": "npm run build:all",
+    "build:all": "npm run build:admin && npm run build:web:optional",
+    "build:admin": "cd admin-panel && npm install && npm run build",
+    "build:web": "node scripts/build-frontend.js",
+    "build:web:optional": "node scripts/build-frontend.js --optional",
+    "create-admin": "node scripts/create-admin.js",
+    "seed": "node scripts/create-admin.js --seed",
+    "users:list": "node scripts/manage-users.js list",
+    "users:create": "node scripts/manage-users.js create",
+    "users:edit": "node scripts/manage-users.js edit",
+    "users:disable": "node scripts/manage-users.js disable",
+    "users:enable": "node scripts/manage-users.js enable",
+    "users:delete": "node scripts/manage-users.js delete"
+  },
+  "dependencies": {
+    "argon2": "^0.41.1",
+    "better-sqlite3": "^11.9.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.1"
+  }
+}

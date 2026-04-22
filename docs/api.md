@@ -1,0 +1,489 @@
+# API Reference — MyKHSU Backend
+
+Базовый URL: `http://localhost:8080`
+
+---
+
+## Публичный API (`/api/*`)
+
+Все публичные эндпоинты доступны без авторизации.  
+Все ответы — JSON. Заголовки: `Cache-Control: no-store`.
+
+---
+
+### GET `/api/meta`
+
+Метаданные версии, билда и проекта.
+
+**Ответ:**
+```json
+{
+  "app_name": "MyKHSU Backend",
+  "app_short_name": "MyKHSU",
+  "api_version": "1.1.0",
+  "app_version": "1.1.0",
+  "build_number": "2026.04.22.1",
+  "build_date": "2026-04-22T00:00:00.000Z",
+  "admin_panel_version": "1.1.0",
+  "frontend_version": "1.1.0",
+  "contacts": {
+    "team": "ITI KHSU",
+    "projectUrl": "https://github.com/PRO100BYTE/MyKHSU"
+  }
+}
+```
+
+---
+
+### GET `/api/getpairs`
+
+Получить список занятий на указанный день.
+
+**Query-параметры:**
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| `type` | `group` \| `teacher` \| `auditory` | ✓ | Тип поиска |
+| `group` или `data` | string | ✓ | Название группы / ФИО преподавателя / аудитории |
+| `date` | string | ✓ | Дата в формате `dd.MM.yyyy` или `yyyy-MM-dd` |
+
+**Ответ:** массив объектов занятия
+
+```json
+[
+  {
+    "id": 42,
+    "type_lesson": "Лекция",
+    "subject": "Математика",
+    "teacher": "Иванов И.И.",
+    "auditory": "101",
+    "time": 1,
+    "time_start": "08:00",
+    "time_end": "09:30",
+    "group": ["ИТ-21"]
+  }
+]
+```
+
+**Legacy-формат:** `GET /api/getpairs/{type}:{group}:{date}`
+
+---
+
+### GET `/api/getpairsweek`
+
+Расписание на неделю.
+
+**Query-параметры:**
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| `type` | `group` \| `teacher` \| `auditory` | ✓ | Тип поиска |
+| `data` | string | ✓ | Название группы / ФИО / аудитории |
+| `week` | number | ✓ | Номер учебной недели |
+
+**Ответ:**
+
+```json
+{
+  "week_number": 15,
+  "days": [
+    {
+      "weekday": 1,
+      "lessons": [ { "id": 1, "type_lesson": "Лекция", ... } ]
+    }
+  ],
+  "dates": { "date_start": "2025-04-07", "date_end": "2025-04-13" }
+}
+```
+
+---
+
+### GET `/api/getfullschedule`
+
+Полное расписание по курсу за диапазон недель.
+
+**Query-параметры:** `course` (number), `from` (число недели), `to` (число недели)
+
+**Ответ:** массив `{ group_name, weeks: [{ week_number, days: [...] }] }`
+
+---
+
+### GET `/api/getgroups`
+
+**Query-параметры:** `course` (number, необязателен)
+
+**Ответ:** `["ИТ-21", "ИТ-22", ...]`
+
+**Legacy:** `GET /api/getgroups/{course}`
+
+---
+
+### GET `/api/getcourses`
+
+**Ответ:** `[1, 2, 3, 4]`
+
+---
+
+### GET `/api/getdates`
+
+**Query-параметры:** `week` (number)
+
+**Ответ:** массив дат понедельника—воскресенья: `["2025-04-07", ..., "2025-04-13"]`
+
+---
+
+### GET `/api/getdatesextended/{week}`
+
+**Ответ:** `{ "date_start": "2025-04-07", "date_end": "2025-04-13" }`
+
+---
+
+### GET `/api/lastweeknumber`
+
+**Query-параметры:** `group` (string)
+
+**Ответ:** `{ "last_week": 30 }`
+
+---
+
+### GET `/api/weeknumbers`
+
+**Ответ:**
+```json
+{ "weeks": [1, 2, 3, ...], "current": 15 }
+```
+
+---
+
+### GET `/api/lastupdate`
+
+**Ответ:** `{ "last_update": "22.04.2026 10:12:04" }`
+
+---
+
+### GET `/api/getpairstime`
+
+**Query-параметры:** `include_id` (`true` / `false`, по умолчанию `false`)
+
+**Ответ:** массив записей о расписании звонков:
+```json
+[
+  { "time": 1, "time_start": "08:00", "time_end": "09:30" }
+]
+```
+
+---
+
+### GET `/api/getmaincolumns`
+
+**Ответ:**
+```json
+{
+  "types": ["Лекция", "Практика", "Лабораторная"],
+  "auditories": ["101", "202"],
+  "subjects": ["Математика", "Физика"],
+  "teachers": ["Иванов И.И."]
+}
+```
+
+---
+
+### GET `/api/search/{query}`
+
+Поиск по группам, преподавателям и аудиториям.
+
+**Ответ:**
+```json
+[
+  { "value": "ИТ-21", "type": "group" },
+  { "value": "Иванов И.И.", "type": "teacher" },
+  { "value": "101", "type": "auditory" }
+]
+```
+
+---
+
+### GET `/api/news`
+
+**Query-параметры:**
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `amount` | `20` | Количество новостей |
+| `from` | `0` | Смещение (offset) |
+| `include_id` | `false` | Включать поле `id` |
+
+**Ответ:**
+```json
+[
+  { "content": "Текст новости", "date": "2026-04-22 10:00:00", "last_change": null }
+]
+```
+
+---
+
+## Административный API (`/adminapi/*`)
+
+Все эндпоинты кроме `/login` и `/checktoken` требуют JWT-токен.
+
+**Авторизация:** заголовок `Authorization: Bearer <token>` или `Token: <token>`
+
+---
+
+### POST `/adminapi/login`
+
+```json
+// Request body
+{ "username": "admin", "password": "password123" }
+
+// Response 200
+{ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+
+// Response 401
+{ "error": "Invalid credentials" }
+
+// Response 403
+{ "error": "User is disabled" }
+```
+
+Токен действителен **24 часа**.
+
+---
+
+### POST `/adminapi/checktoken`
+
+Проверить токен.
+
+**Response 200:** `{ "valid": true, "user": { "uid": 1, "username": "admin" } }`
+
+---
+
+### GET `/adminapi/users`
+
+Список пользователей админ-панели.
+
+**Response 200:**
+```json
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "is_active": true,
+    "created_at": "2026-04-22 10:00:00",
+    "updated_at": "2026-04-22 10:00:00"
+  }
+]
+```
+
+---
+
+### POST `/adminapi/users`
+
+Создать пользователя админки.
+
+```json
+// Request
+{ "username": "newadmin", "password": "very-strong-password", "is_active": true }
+
+// Response
+{ "ok": true, "id": 5 }
+```
+
+---
+
+### PATCH `/adminapi/users/{id}`
+
+Редактирование пользователя (логин, пароль, активность).
+
+```json
+// Request
+{ "username": "admin2", "password": "new-password", "is_active": true }
+
+// Response
+{ "ok": true }
+```
+
+---
+
+### POST `/adminapi/users/{id}/disable`
+
+Отключить пользователя.
+
+**Response:** `{ "ok": true }`
+
+---
+
+### POST `/adminapi/users/{id}/enable`
+
+Включить пользователя.
+
+**Response:** `{ "ok": true }`
+
+---
+
+### DELETE `/adminapi/users/{id}`
+
+Удалить пользователя.
+
+**Response:** `{ "ok": true }`
+
+---
+
+### DELETE `/adminapi/deletetable`
+
+Удалить все записи из таблицы `pairs`.
+
+**Response:** `{ "ok": true }`
+
+---
+
+### POST `/adminapi/createtable`
+
+Загрузить расписание из JSON-файла (полная замена — таблица очищается перед загрузкой).
+
+**Body:** `multipart/form-data`, поле `file` — JSON-файл в формате ХГСУ.
+
+**Response:** `{ "ok": true, "inserted": 1234 }`
+
+---
+
+### POST `/adminapi/updatetable`
+
+Дополнить расписание из JSON-файла (без удаления существующих данных).
+
+**Body:** аналогично `createtable`.
+
+---
+
+### POST `/adminapi/updatepairs`
+
+Ручное редактирование занятий.
+
+```json
+{
+  "group": "ИТ-21",
+  "course": 2,
+  "date": "22.04.2026",
+  "week_number": 15,
+  "weekday": 3,
+  "lessons": [
+    {
+      "id": "42",
+      "type": "Лекция",
+      "subject": "Математика",
+      "teacher": "Иванов И.И.",
+      "auditory": "101",
+      "method": "update"
+    },
+    {
+      "type": "Практика",
+      "subject": "Физика",
+      "teacher": "Петров П.П.",
+      "auditory": "202",
+      "method": "create"
+    },
+    { "id": "55", "method": "delete" }
+  ]
+}
+```
+
+Поле `method`: `create` | `update` | `delete` | `pass`.
+
+---
+
+### POST `/adminapi/updatetimes`
+
+CRUD для расписания звонков. Body — массив:
+
+```json
+[
+  { "time": 1, "time_start": "08:00", "time_end": "09:30", "method": "create" },
+  { "id": 2, "time": 2, "time_start": "09:40", "time_end": "11:10", "method": "update" },
+  { "id": 3, "method": "delete" }
+]
+```
+
+---
+
+### POST `/adminapi/createnews`
+
+```json
+// Request
+{ "content": "Текст новости" }
+// Response
+{ "ok": true, "id": 5 }
+```
+
+---
+
+### POST `/adminapi/editnews?id=N`
+
+```json
+// Request
+{ "content": "Обновлённый текст" }
+// Response
+{ "ok": true }
+```
+
+---
+
+### DELETE `/adminapi/deletenews?id=N`
+
+**Response:** `{ "ok": true }`
+
+---
+
+## Формат JSON расписания (импорт)
+
+Ожидаемая структура файла для загрузки через `/adminapi/createtable`:
+
+```json
+{
+  "Timetable": [
+    {
+      "WeekNumber": 15,
+      "DateStart": "2025-04-07",
+      "DateEnd": "2025-04-13",
+      "Groups": [
+        {
+          "Course": 2,
+          "GroupName": "ИТ-21",
+          "Faculty": "ИТИ",
+          "Days": [
+            {
+              "Weekday": 1,
+              "WeekNumber": 15,
+              "Lessons": [
+                {
+                  "Time": 1,
+                  "Type": "Лекция",
+                  "Subject": "Математика",
+                  "Teachers": [{ "TeacherName": "Иванов И.И." }],
+                  "Auditories": [{ "AuditoryName": "101" }],
+                  "Date": "2025-04-07",
+                  "Subgroup": 0,
+                  "Week": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Поддерживаются как `PascalCase`, так и `snake_case` ключи.
+
+---
+
+## Коды ошибок
+
+| Код | Значение |
+|---|---|
+| 400 | Неверные входные данные (см. поле `error`) |
+| 401 | Токен не предоставлен или недействителен |
+| 403 | Токен валиден, но недостаточно прав |
+| 404 | Ресурс не найден |
+| 500 | Внутренняя ошибка сервера |
