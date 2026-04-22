@@ -157,51 +157,6 @@ export default function App() {
         </main>
       </div>
 
-      {profileOpen ? (
-        <div className="modal-overlay" onClick={() => setProfileOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal__header">
-              <h3>Профиль пользователя</h3>
-            </div>
-            <div className="form-grid" style={{ gap: 12 }}>
-              <label className="field">
-                <span className="field__label">Логин</span>
-                <input className="input" value={profileForm.username} onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Имя</span>
-                <input className="input" value={profileForm.first_name} onChange={e => setProfileForm(p => ({ ...p, first_name: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Фамилия</span>
-                <input className="input" value={profileForm.last_name} onChange={e => setProfileForm(p => ({ ...p, last_name: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Должность</span>
-                <input className="input" value={profileForm.position} onChange={e => setProfileForm(p => ({ ...p, position: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Email для уведомлений/восстановления</span>
-                <input type="email" className="input" value={profileForm.email} onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Текущий пароль</span>
-                <input type="password" className="input" value={profileForm.current_password} onChange={e => setProfileForm(p => ({ ...p, current_password: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Новый пароль</span>
-                <input type="password" className="input" value={profileForm.new_password} onChange={e => setProfileForm(p => ({ ...p, new_password: e.target.value }))} />
-              </label>
-            </div>
-            <div className="modal__footer">
-              <button className="btn" onClick={() => setProfileOpen(false)}>Отмена</button>
-              <button className="btn btn-primary" onClick={saveProfile} disabled={profileSaving}>
-                {profileSaving ? 'Сохранение...' : 'Сохранить'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
