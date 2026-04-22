@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
@@ -11,6 +11,7 @@ import TimesScreen from './screens/TimesScreen';
 import UsersScreen from './screens/UsersScreen';
 import AppearanceScreen from './screens/AppearanceScreen';
 import UnifiedWindowScreen from './screens/UnifiedWindowScreen';
+import ProfileScreen from './screens/ProfileScreen';
 import BrandMark from './components/BrandMark';
 import { ADMIN_UI } from './constants';
 
@@ -37,64 +38,16 @@ export default function App() {
   const { user, loading } = useAuth();
   const { showNavLabels, uiDensity } = useTheme();
   const location = useLocation();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profileForm, setProfileForm] = useState({
-    username: '',
-    first_name: '',
-    last_name: '',
-    position: '',
-    email: '',
-    current_password: '',
-    new_password: '',
-  });
-  const [profileSaving, setProfileSaving] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 768);
 
+  // Auto-collapse sidebar on small screens
   useEffect(() => {
-    if (!profileOpen) return;
+    const onResize = () => setSidebarCollapsed(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-    let mounted = true;
-    (async () => {
-      const resp = await api.getProfile();
-      if (!mounted || !resp?.ok) return;
-      const data = resp.data || {};
-      setProfileForm(prev => ({
-        ...prev,
-        username: data.username || '',
-        first_name: data.first_name || '',
-        last_name: data.last_name || '',
-        position: data.position || '',
-        email: data.email || '',
-      }));
-    })();
-
-    return () => { mounted = false; };
-  }, [profileOpen]);
-
-  const saveProfile = async () => {
-    setProfileSaving(true);
-    const payload = {
-      username: profileForm.username,
-      first_name: profileForm.first_name,
-      last_name: profileForm.last_name,
-      position: profileForm.position,
-      email: profileForm.email,
-    };
-    if (profileForm.new_password) {
-      payload.current_password = profileForm.current_password;
-      payload.new_password = profileForm.new_password;
-    }
-
-    const resp = await api.updateProfile(payload);
-    setProfileSaving(false);
-    if (!resp?.ok) {
-      alert(resp?.data?.error || 'Не удалось обновить профиль');
-      return;
-    }
-
-    setProfileForm(prev => ({ ...prev, current_password: '', new_password: '' }));
-    alert('Профиль обновлён');
-    setProfileOpen(false);
-  };
+  const toggleSidebar = useCallback(() => setSidebarCollapsed(c => !c), []);
 
   if (loading) {
     return (
@@ -119,7 +72,7 @@ export default function App() {
       <div className="admin-layout__noise" />
 
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}>
         <div className="sidebar__brand">
           <div className="sidebar__logo-wrap">
             <BrandMark className="sidebar__logo" />
@@ -128,19 +81,21 @@ export default function App() {
             <div className="sidebar__brand-title">{ADMIN_UI.brandTitle}</div>
             <div className="sidebar__brand-sub">{ADMIN_UI.brandSubTitle}</div>
           </div>
+          <button className="sidebar__collapse-btn" onClick={toggleSidebar} title={sidebarCollapsed ? 'Развернуть' : 'Свернуть'}>
+            <ion-icon name={sidebarCollapsed ? 'chevron-forward-outline' : 'chevron-back-outline'} />
+          </button>
         </div>
 
         <nav className="sidebar__nav">
-          <div className="sidebar__section-label">Навигация</div>
           {NAV_ITEMS.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) => `sidebar__item${isActive ? ' active' : ''}`}
-              title={!showNavLabels ? item.label : undefined}
+              title={sidebarCollapsed || !showNavLabels ? item.label : undefined}
             >
               <ion-icon name={item.icon} />
-              {showNavLabels ? <span className="sidebar__item-label">{item.label}</span> : null}
+              {!sidebarCollapsed && showNavLabels ? <span className="sidebar__item-label">{item.label}</span> : null}
             </NavLink>
           ))}
         </nav>
@@ -149,16 +104,20 @@ export default function App() {
           <div className="sidebar__user-menu">
             <button className="sidebar__user-trigger" type="button">
               <div className="sidebar__avatar">
-                {user.username?.[0]?.toUpperCase() ?? 'A'}
+                {user.first_name ? user.first_name[0].toUpperCase() : user.username?.[0]?.toUpperCase() ?? 'A'}
               </div>
-              <div className="sidebar__user-name">{user.username}</div>
-              <ion-icon name="chevron-up-outline" />
+              {!sidebarCollapsed && (
+                <div className="sidebar__user-name">
+                  {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                </div>
+              )}
+              {!sidebarCollapsed && <ion-icon name="chevron-up-outline" />}
             </button>
             <div className="profile-menu">
-              <button className="profile-menu__item" onClick={() => setProfileOpen(true)}>
+              <NavLink to="/profile" className="profile-menu__item">
                 <ion-icon name="person-outline" />
                 Профиль
-              </button>
+              </NavLink>
               <NavLink to="/appearance" className="profile-menu__item">
                 <ion-icon name="color-palette-outline" />
                 Внешний вид
@@ -192,6 +151,7 @@ export default function App() {
             <Route path="/users" element={<UsersScreen />} />
             <Route path="/unified-window" element={<UnifiedWindowScreen />} />
             <Route path="/appearance" element={<AppearanceScreen />} />
+            <Route path="/profile" element={<ProfileScreen />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
