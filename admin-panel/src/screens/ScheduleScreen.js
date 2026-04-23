@@ -485,6 +485,7 @@ function GroupsTab() {
     if (normalized.length && !normalized.includes(parseInt(course, 10))) {
       setCourse(String(normalized[0]));
     }
+    return normalized;
   };
 
   const loadGroups = async (courseValue = course) => {
@@ -542,6 +543,44 @@ function GroupsTab() {
       variant: 'success',
       title: resp.data?.inserted ? 'Курс добавлен.' : 'Курс уже существует.',
     });
+  };
+
+  const deleteCourse = async () => {
+    const parsedCourse = parseInt(course, 10);
+    if (Number.isNaN(parsedCourse)) {
+      showToast({ variant: 'warning', title: 'Выберите курс.', code: 'UI-SCH-015' });
+      return;
+    }
+
+    const accepted = await confirm({
+      title: 'Удаление курса',
+      message: `Удалить курс ${parsedCourse}? Будут удалены и группы этого курса в каталоге.`,
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
+
+    const resp = await api.deleteCatalogCourse(parsedCourse);
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось удалить курс.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-016',
+      });
+      return;
+    }
+
+    const nextCourses = await loadCourses();
+    const nextCourse = nextCourses.length ? String(nextCourses[0]) : '';
+    if (nextCourse) {
+      setCourse(nextCourse);
+      await loadGroups(nextCourse);
+    } else {
+      setCourse('');
+      setGroups([]);
+    }
+    showToast({ variant: 'success', title: 'Курс удалён.' });
   };
 
   const createGroup = async () => {
@@ -640,9 +679,12 @@ function GroupsTab() {
       <div className="card__body" style={{ display: 'grid', gap: 14 }}>
         <div className="table-wrap" style={{ padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>Добавить курс</div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <input className="input" placeholder="Номер курса" value={courseToCreate} onChange={e => setCourseToCreate(e.target.value)} />
             <button type="button" className="btn" onClick={createCourse}>Добавить курс</button>
+            <button type="button" className="btn btn-danger" onClick={deleteCourse} disabled={!courses.length}>
+              Удалить выбранный курс
+            </button>
           </div>
         </div>
 
