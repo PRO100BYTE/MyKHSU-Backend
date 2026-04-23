@@ -136,8 +136,9 @@ cd admin-panel && npm install && npm run build
 | `/admin-panel/times` | TimesScreen | Редактор расписания звонков |
 | `/admin-panel/news` | NewsScreen | Управление новостями |
 | `/admin-panel/users` | UsersScreen | Пользователи админки (CRUD + disable/enable) |
+| `/admin-panel/login-history` | LoginHistoryScreen | История входов администраторов со всеми деталями (IP, ОС, браузер, устройство, пагинация, фильтры) |
 | `/admin-panel/unified-window` | UnifiedWindowScreen | Обращения «Единого окна» и обработка статусов |
-| `/admin-panel/profile` | ProfileScreen | Профиль текущего пользователя (имя, отчество, фамилия, должность, email, пароль) |
+| `/admin-panel/profile` | ProfileScreen | Профиль текущего пользователя (имя, отчество, фамилия, должность, email, пароль) + история входов |
 | `/admin-panel/appearance` | AppearanceScreen | Настройки темы и акцентного цвета в стиле MyKHSU |
 | `/admin-panel/system-info` | SystemInfoScreen | Информация о системе (версии, git hash, сборка GMT+7, оперативность и runtime/DB статистика) |
 
