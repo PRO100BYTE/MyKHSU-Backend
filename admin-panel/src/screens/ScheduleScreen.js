@@ -25,15 +25,15 @@ export default function ScheduleScreen() {
         </div>
         <div>
           <div className="screen-hero__title">Расписание</div>
-          <div className="screen-hero__sub">Импорт JSON, ручной ввод на день/неделю и очистка таблицы занятий</div>
+          <div className="screen-hero__sub">Импорт JSON, ручное редактирование по неделе, управление группами и очистка таблицы занятий</div>
         </div>
       </div>
 
       <div className="segmented">
         {[
           { id: 'upload', label: 'Загрузка', icon: 'cloud-upload-outline' },
-          { id: 'manual', label: 'Ручной ввод', icon: 'create-outline' },
-          { id: 'edit', label: 'Редактирование', icon: 'pencil-outline' },
+          { id: 'manual', label: 'Ручное редактирование', icon: 'create-outline' },
+          { id: 'groups', label: 'Управление группами', icon: 'people-outline' },
           { id: 'delete', label: 'Очистить', icon: 'trash-outline' },
         ].map(item => (
           <button
@@ -49,7 +49,7 @@ export default function ScheduleScreen() {
 
       {tab === 'upload' ? <UploadTab /> : null}
       {tab === 'manual' ? <ManualTab /> : null}
-      {tab === 'edit' ? <EditTab /> : null}
+      {tab === 'groups' ? <GroupsTab /> : null}
       {tab === 'delete' ? <DeleteTab /> : null}
     </div>
   );
