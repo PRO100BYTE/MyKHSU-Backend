@@ -10,7 +10,7 @@ import { getWeekDates, normalizeDate } from '../utils/dates.js';
 import { hasPermission, USER_ROLES } from '../utils/permissions.js';
 import { encryptText, decryptText, encryptBuffer, decryptBuffer } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
-import { logUserLogin } from '../utils/login-logger.js';
+import { logUserLogin, getAllLoginHistory, getUserLoginHistory, getUserLoginStats } from '../utils/login-logger.js';
 import {
   nowKrasnoyarskSql,
   plusHoursKrasnoyarskSql,
@@ -1620,7 +1620,6 @@ router.get('/login-history', requireAuth, requirePermission('users:read'), (req,
   }
 
   try {
-    const { getAllLoginHistory } = await import('../utils/login-logger.js');
     const history = getAllLoginHistory(limit, offset, userId);
 
     // Получаем общее количество записей
@@ -1666,7 +1665,6 @@ router.get('/users/:id/login-history', requireAuth, (req, res) => {
   const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
   try {
-    const { getUserLoginHistory } = await import('../utils/login-logger.js');
     const history = getUserLoginHistory(userId, limit, offset);
 
     // Получаем общее количество записей
@@ -1702,7 +1700,6 @@ router.get('/users/:id/login-stats', requireAuth, (req, res) => {
   }
 
   try {
-    const { getUserLoginStats } = await import('../utils/login-logger.js');
     const stats = getUserLoginStats(userId);
     res.json(stats);
   } catch (err) {
