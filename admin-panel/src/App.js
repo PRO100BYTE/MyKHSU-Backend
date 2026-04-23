@@ -84,6 +84,7 @@ export default function App() {
     '/times':     'Расписание звонков',
     '/news':      'Новости',
     '/users':     'Пользователи',
+    '/login-history': 'История входов',
     '/unified-window': 'Единое окно',
     '/appearance': 'Внешний вид',
     '/system-info': 'Информация о системе',
@@ -177,6 +178,7 @@ export default function App() {
             <Route path="/times" element={<ProtectedRoute requiredPerms={['times:write']}><TimesScreen /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute requiredPerms={['news:write']}><NewsScreen /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredPerms={['users:write']}><UsersScreen /></ProtectedRoute>} />
+            <Route path="/login-history" element={<ProtectedRoute requiredPerms={['users:read']}><LoginHistoryScreen /></ProtectedRoute>} />
             <Route path="/unified-window" element={<ProtectedRoute requiredPerms={['unified_window:write']}><UnifiedWindowScreen /></ProtectedRoute>} />
             <Route path="/appearance" element={<AppearanceScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
