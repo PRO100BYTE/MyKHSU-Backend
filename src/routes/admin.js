@@ -468,6 +468,9 @@ router.post('/login', async (req, res) => {
     return sendAdminError(res, 401, 'ADM-AUTH-002', 'Invalid credentials');
   }
 
+  // Логируем вход
+  await logUserLogin(user.id, req);
+
   const token = jwt.sign(
     { uid: user.id, username: user.username, auth: true },
     config.jwtSecret,
@@ -1602,5 +1605,110 @@ router.delete('/unified-window/tickets/:id', requireAuth, requirePermission('uni
   usersDb.prepare('DELETE FROM unified_window_tickets WHERE id = ?').run(id)
   res.json({ ok: true })
 })
+
+// ---------------------------------------------------------------------------
+// GET /adminapi/login-history — получить историю входов всех пользователей (только админ)
+// Query params: limit, offset, userId (опционально)
+// ---------------------------------------------------------------------------
+router.get('/login-history', requireAuth, requirePermission('users:read'), (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+  const userId = req.query.userId ? parseInt(req.query.userId, 10) : null;
+
+  if (userId && Number.isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid userId' });
+  }
+
+  try {
+    const { getAllLoginHistory } = await import('../utils/login-logger.js');
+    const history = getAllLoginHistory(limit, offset, userId);
+
+    // Получаем общее количество записей
+    let countQuery = 'SELECT COUNT(*) as count FROM login_history';
+    const countParams = [];
+    if (userId) {
+      countQuery += ' WHERE user_id = ?';
+      countParams.push(userId);
+    }
+    const { count } = usersDb.prepare(countQuery).get(...countParams);
+
+    res.json({
+      data: history,
+      pagination: {
+        total: count,
+        limit,
+        offset,
+        pages: Math.ceil(count / limit)
+      }
+    });
+  } catch (err) {
+    console.error('Failed to get login history:', err.message);
+    res.status(500).json({ error: 'Failed to get login history' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /adminapi/users/:id/login-history — получить историю входов конкретного пользователя
+// Query params: limit, offset
+// ---------------------------------------------------------------------------
+router.get('/users/:id/login-history', requireAuth, (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (Number.isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  // Пользователь может видеть свою историю входов или быть админом
+  if (req.user.uid !== userId && !hasPermission(req.user.role, 'users:read')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+  try {
+    const { getUserLoginHistory } = await import('../utils/login-logger.js');
+    const history = getUserLoginHistory(userId, limit, offset);
+
+    // Получаем общее количество записей
+    const { count } = usersDb.prepare('SELECT COUNT(*) as count FROM login_history WHERE user_id = ?').get(userId);
+
+    res.json({
+      data: history,
+      pagination: {
+        total: count,
+        limit,
+        offset,
+        pages: Math.ceil(count / limit)
+      }
+    });
+  } catch (err) {
+    console.error('Failed to get user login history:', err.message);
+    res.status(500).json({ error: 'Failed to get login history' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /adminapi/users/:id/login-stats — получить статистику входов пользователя
+// ---------------------------------------------------------------------------
+router.get('/users/:id/login-stats', requireAuth, (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (Number.isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  // Пользователь может видеть свою статистику входов или быть админом
+  if (req.user.uid !== userId && !hasPermission(req.user.role, 'users:read')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { getUserLoginStats } = await import('../utils/login-logger.js');
+    const stats = getUserLoginStats(userId);
+    res.json(stats);
+  } catch (err) {
+    console.error('Failed to get user login stats:', err.message);
+    res.status(500).json({ error: 'Failed to get login stats' });
+  }
+});
 
 export default router;
