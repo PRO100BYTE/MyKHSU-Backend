@@ -66,7 +66,7 @@ export default function UnifiedWindowScreen() {
     })
   }
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (preserveSelectedId = selectedId) => {
     setLoading(true)
     const resp = await api.getUwTickets({ status: statusFilter || undefined, limit: 200 })
     setLoading(false)
@@ -76,14 +76,14 @@ export default function UnifiedWindowScreen() {
     }
     const list = Array.isArray(resp.data) ? resp.data : []
     setTickets(list)
-    if (!list.some(ticket => ticket.id === selectedId)) {
+    if (!list.some(ticket => ticket.id === preserveSelectedId)) {
       setSelectedId(null)
       setSelected(null)
     }
   }
 
   useEffect(() => {
-    fetchTickets()
+    fetchTickets(ticketId)
   }, [statusFilter])
 
   const openTicket = async (ticketId) => {
@@ -105,7 +105,7 @@ export default function UnifiedWindowScreen() {
       status: resp.data?.status || 'open',
       comment: '',
     })
-    fetchTickets()
+    fetchTickets(selected.id)
   }
 
   const counts = useMemo(() => {
@@ -166,7 +166,7 @@ export default function UnifiedWindowScreen() {
     if (!refreshed) return
 
     setForm({ responseText: '' })
-    fetchTickets()
+    fetchTickets(selected.id)
     showToast({ variant: 'success', title: 'Ответ отправлен.' })
   }
 
@@ -294,10 +294,10 @@ export default function UnifiedWindowScreen() {
                     </p>
                   </div>
                   <div className="uw-admin-chat__controls">
-                    <button className="btn" onClick={() => setStatusModalOpen(true)} disabled={saving}>
+                    <button type="button" className="btn" onClick={() => setStatusModalOpen(true)} disabled={saving}>
                       Изменить статус
                     </button>
-                    <button className="btn btn-danger" onClick={deleteTicket} disabled={saving}>
+                    <button type="button" className="btn btn-danger" onClick={deleteTicket} disabled={saving}>
                       Удалить
                     </button>
                   </div>
@@ -328,8 +328,8 @@ export default function UnifiedWindowScreen() {
                         </label>
                       </div>
                       <div className="modal__footer">
-                        <button className="btn" onClick={() => setStatusModalOpen(false)}>Отмена</button>
-                        <button className="btn btn-primary" onClick={applyStatusChange} disabled={saving}>
+                        <button type="button" className="btn" onClick={() => setStatusModalOpen(false)}>Отмена</button>
+                        <button type="button" className="btn btn-primary" onClick={applyStatusChange} disabled={saving}>
                           {saving ? 'Сохранение...' : 'Сохранить'}
                         </button>
                       </div>
@@ -372,7 +372,7 @@ export default function UnifiedWindowScreen() {
                     />
                   </label>
                   <div className="uw-admin-chat__composer-actions">
-                    <button className="btn btn-primary" onClick={sendMessage} disabled={saving || !form.responseText.trim()}>
+                    <button type="button" className="btn btn-primary" onClick={sendMessage} disabled={saving || !form.responseText.trim()}>
                       {saving ? 'Отправка...' : 'Отправить сообщение'}
                     </button>
                   </div>

@@ -158,6 +158,8 @@
 
 `role`: `visitor` | `student` | `teacher`
 
+Для совместимости также поддерживается поле `requester_role` с теми же значениями. Если переданы оба (`role` и `requester_role`), приоритет у `requester_role`.
+
 Данные обращения хранятся в БД `users.sqlite` в таблицах `unified_window_tickets` / `unified_window_messages`. Сообщения и чувствительные поля обращения шифруются (AES-256-GCM).
 
 ---

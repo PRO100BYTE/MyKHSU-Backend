@@ -433,7 +433,7 @@ function decryptTicketField(row, field) {
 
 // POST /api/unified-window/tickets — создать обращение
 router.post('/unified-window/tickets', (req, res) => {
-  const { role, subject, contact_email, contact_name, message, priority } = req.body ?? {}
+  const { role, requester_role, subject, contact_email, contact_name, message, priority } = req.body ?? {}
 
   if (!subject || !String(subject).trim()) {
     return res.status(400).json({ error: 'subject is required' })
@@ -444,7 +444,8 @@ router.post('/unified-window/tickets', (req, res) => {
 
   const validPriorities = ['low', 'normal', 'high', 'urgent']
   const validRoles = ['visitor', 'student', 'teacher']
-  const safeRole = validRoles.includes(role) ? role : 'visitor'
+  const rawRole = String(requester_role ?? role ?? '').trim().toLowerCase()
+  const safeRole = validRoles.includes(rawRole) ? rawRole : 'visitor'
   const safePriority = validPriorities.includes(priority) ? priority : 'normal'
   const safeSubject = String(subject).trim()
   const safeContactEmail = normalizeEmail(contact_email)
