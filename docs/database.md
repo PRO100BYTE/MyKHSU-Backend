@@ -190,6 +190,30 @@
 
 ---
 
+### Таблица `login_history`
+
+История входов администраторов в систему.
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | Уникальный идентификатор входа |
+| `user_id` | INTEGER NOT NULL | ID пользователя (FK → users.id, ON DELETE CASCADE) |
+| `ip_address` | TEXT | IP адрес (поддерживает X-Forwarded-For для прокси) |
+| `user_agent` | TEXT | User-Agent браузера (полная строка) |
+| `device_model` | TEXT | Модель устройства (например, MacBook Pro) |
+| `device_os` | TEXT | Операционная система (Windows, macOS, Linux, iOS, Android) |
+| `device_os_version` | TEXT | Версия ОС |
+| `browser_name` | TEXT | Название браузера (Chrome, Safari, Firefox, Edge, etc.) |
+| `browser_version` | TEXT | Версия браузера |
+| `login_timestamp` | TEXT NOT NULL | Дата и время входа (`YYYY-MM-DD HH:MM:SS`) |
+| `created_at` | TEXT NOT NULL | Дата записи в БД (для истории событий) |
+
+**Индексы:** `user_id`, `login_timestamp`, `ip_address`
+
+Информация об устройстве и браузере парсится из User-Agent при помощи библиотеки `ua-parser-js`.
+
+---
+
 ## Начальные данные
 
 При первом запуске (`npm run seed`) создаются два администратора:
