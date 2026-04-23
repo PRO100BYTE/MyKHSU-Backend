@@ -138,7 +138,7 @@ cd admin-panel && npm install && npm run build
 Версия, git hash и дата билда берутся из `GET /api/meta`.  
 Резервные значения вынесены в `admin-panel/src/constants.js`.
 
-При production-сборке (`npm run build`, `npm run build:web`, `npm run build:admin`) автоматически запускается `scripts/sync-build-info.js`: он подставляет версии из `src/constants.js`, актуальный git hash и дату/время сборки в часовом поясе Красноярска (`Asia/Krasnoyarsk`, GMT+7).
+При production-сборке (`npm run build`, `npm run build:web`, `npm run build:admin`) автоматически запускается `scripts/sync-build-info.js`: для admin/backend он подставляет версии из `src/constants.js`, актуальный git hash и дату/время сборки в часовом поясе Красноярска (`Asia/Krasnoyarsk`, GMT+7). Для MyKHSU-web версия приложения остается ручной, а автоматически обновляются только build-хеш и дата сборки в формате `DD.MM.YYYY` (как в предыдущем формате web-интерфейса).
 
 ### Темы
 

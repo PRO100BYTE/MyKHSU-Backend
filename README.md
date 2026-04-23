@@ -140,6 +140,8 @@ MyKHSU-Backend/
 - генерирует `src/build-info.generated.js` для backend;
 - генерирует `.env.production.local` для `admin-panel` и `mykhsu-web`.
 
+Для `mykhsu-web` версия приложения (`APP_VERSION`) остается независимой и задается вручную в исходниках web-приложения. Скрипт синхронизирует только build-поля (`REACT_APP_BUILD_VER`, `REACT_APP_BUILD_DATE`, `REACT_APP_BUILD_DATE_ISO`, timezone), при этом `REACT_APP_BUILD_DATE` записывается в формате `DD.MM.YYYY`.
+
 Публичный эндпоинт `GET /api/meta` возвращает:
 
 - `api_version`

@@ -89,11 +89,12 @@ function writeWebEnv(meta) {
     return
   }
 
+  const webBuildDate = String(meta.buildDateHuman || '').split(',')[0]?.trim() || '01.01.1970'
+
   const filePath = path.join(webPath, '.env.production.local')
   const lines = [
-    `REACT_APP_APP_VERSION=${meta.frontendVersion}`,
     `REACT_APP_BUILD_VER=git-web-${meta.gitCommitHash}`,
-    `REACT_APP_BUILD_DATE=${meta.buildDateHuman}`,
+    `REACT_APP_BUILD_DATE=${webBuildDate}`,
     `REACT_APP_BUILD_DATE_ISO=${meta.buildDate}`,
     `REACT_APP_BUILD_TIMEZONE=${meta.buildTimeZone}`,
     `REACT_APP_BUILD_TIMEZONE_LABEL=${meta.buildTimeZoneLabel}`,
