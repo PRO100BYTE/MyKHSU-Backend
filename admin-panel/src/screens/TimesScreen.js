@@ -1,39 +1,63 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
 import { useToast } from '../context/ToastContext';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 export default function TimesScreen() {
   const { showToast } = useToast();
+  const { confirm } = useConfirmDialog();
   const [times, setTimes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // pending changes: { [id_or_new_key]: { ...fields, method: create|update|delete } }
   const [changes, setChanges] = useState({});
   const [newCounter, setNewCounter] = useState(0);
+  const [history, setHistory] = useState([]);
 
   async function loadTimes() {
     const data = await api.getPairsTime();
     setTimes(Array.isArray(data) ? data : []);
     setLoading(false);
+    setChanges({});
+    setHistory([]);
   }
 
   useEffect(() => { loadTimes(); }, []);
 
   function handleChange(key, field, value) {
+    setHistory(prev => [...prev.slice(-49), { changes, newCounter }]);
     setChanges(prev => {
       const item = prev[key] ?? times.find(t => t.id === key) ?? {};
       return { ...prev, [key]: { ...item, [field]: value, method: item.method === 'create' ? 'create' : 'update' } };
     });
   }
 
-  function handleDeleteRow(id) {
+  async function handleDeleteRow(id) {
+    const accepted = await confirm({
+      title: 'Удаление строки',
+      message: 'Убрать эту строку из изменений перед сохранением?',
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
+
+    setHistory(prev => [...prev.slice(-49), { changes, newCounter }]);
     setChanges(prev => ({ ...prev, [id]: { ...(times.find(t => t.id === id) ?? prev[id] ?? {}), method: 'delete' } }));
   }
 
   function handleAddRow() {
+    setHistory(prev => [...prev.slice(-49), { changes, newCounter }]);
     const key = `new_${newCounter}`;
     setNewCounter(c => c + 1);
     setChanges(prev => ({ ...prev, [key]: { time: '', time_start: '', time_end: '', method: 'create' } }));
+  }
+
+  function handleUndoLastAction() {
+    if (!history.length) return;
+    const previous = history[history.length - 1];
+    setChanges(previous.changes);
+    setNewCounter(previous.newCounter);
+    setHistory(prev => prev.slice(0, -1));
   }
 
   async function handleSave() {
@@ -42,12 +66,22 @@ export default function TimesScreen() {
       if (val.method === 'delete') return { id: key, method: 'delete' };
       return { id: key, time: Number(val.time), time_start: val.time_start, time_end: val.time_end, method: 'update' };
     });
+    if (!items.length) return;
+
+    const accepted = await confirm({
+      title: 'Сохранение звонков',
+      message: `Применить изменений: ${items.length}?`,
+      confirmText: 'Сохранить',
+    });
+    if (!accepted) return;
+
     setSaving(true);
     const res = await api.updateTimes(items);
     setSaving(false);
     if (res?.ok) {
       showToast({ variant: 'success', title: 'Расписание звонков сохранено.' });
       setChanges({});
+      setHistory([]);
       loadTimes();
     } else {
       showToast({
@@ -95,6 +129,11 @@ export default function TimesScreen() {
             <button className="btn btn-ghost btn-sm" onClick={handleAddRow}>
               <ion-icon name="add-outline" />Добавить
             </button>
+            {history.length > 0 && hasChanges && (
+              <button className="btn btn-ghost btn-sm" onClick={handleUndoLastAction} disabled={saving}>
+                <ion-icon name="arrow-undo-outline" />Отменить последнее
+              </button>
+            )}
             {hasChanges && (
               <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
                 {saving ? <span className="spinner spinner-sm" /> : <ion-icon name="save-outline" />}
