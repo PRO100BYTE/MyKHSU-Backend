@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../api';
 import { useToast } from '../context/ToastContext';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
@@ -13,6 +13,25 @@ const EMPTY_LESSON = {
   teacher: '',
   auditory: '',
 };
+
+const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5, 6]
+
+function emptyPlannerCell() {
+  return { id: null, type: '', subject: '', teacher: '', auditory: '' }
+}
+
+function normalizeCellValue(value) {
+  return String(value ?? '').trim()
+}
+
+function plannerCellHasContent(cell) {
+  return Boolean(
+    normalizeCellValue(cell?.type) ||
+    normalizeCellValue(cell?.subject) ||
+    normalizeCellValue(cell?.teacher) ||
+    normalizeCellValue(cell?.auditory)
+  )
+}
 
 export default function ScheduleScreen() {
   const [tab, setTab] = useState('upload');
@@ -61,10 +80,13 @@ function ManualTab() {
   const [course, setCourse] = useState('1');
   const [group, setGroup] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
-  const [lessons, setLessons] = useState([EMPTY_LESSON]);
   const [courses, setCourses] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [cells, setCells] = useState({});
+  const [initialCells, setInitialCells] = useState({});
+  const [loadingWeek, setLoadingWeek] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -107,96 +129,222 @@ function ManualTab() {
     return () => { mounted = false; };
   }, [course, group]);
 
-  const groupedWeekRows = useMemo(() => {
-    return WEEKDAYS.map(day => ({
-      day,
-      rows: lessons.filter(item => (item.weekday || 'Понедельник') === day),
-    })).filter(chunk => chunk.rows.length > 0);
-  }, [lessons]);
+  const buildPlannerState = (slots, pairs) => {
+    const nextCells = {}
 
-  const updateLesson = (index, field, value) => {
-    setLessons(prev => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
-  };
+    for (const slot of slots) {
+      for (const weekday of WEEKDAY_NUMBERS) {
+        nextCells[`${slot.id}-${weekday}`] = emptyPlannerCell()
+      }
+    }
 
-  const addLesson = () => {
-    setLessons(prev => [...prev, EMPTY_LESSON]);
-  };
+    for (const pair of pairs) {
+      const slotId = Number(pair.time)
+      const weekday = Number(pair.weekday)
+      if (!slotId || !WEEKDAY_NUMBERS.includes(weekday)) continue
 
-  const removeLesson = (index) => {
-    setLessons(prev => prev.filter((_, i) => i !== index));
-  };
+      const key = `${slotId}-${weekday}`
+      if (!(key in nextCells)) continue
+
+      nextCells[key] = {
+        id: pair.id,
+        type: normalizeCellValue(pair.type),
+        subject: normalizeCellValue(pair.subject),
+        teacher: normalizeCellValue(pair.teacher),
+        auditory: normalizeCellValue(pair.auditory),
+      }
+    }
+
+    return nextCells
+  }
+
+  const loadWeekSchedule = async () => {
+    const parsedCourse = parseInt(course, 10)
+    const parsedWeek = parseInt(weekNumber, 10)
+    if (!group.trim() || Number.isNaN(parsedCourse) || Number.isNaN(parsedWeek)) return
+
+    setLoadingWeek(true)
+    const [timesResp, pairsResp] = await Promise.all([
+      api.getPairsTime(),
+      api.getPairs({ group: group.trim(), course: parsedCourse, week_number: parsedWeek }),
+    ])
+    setLoadingWeek(false)
+
+    const rawSlots = Array.isArray(timesResp) ? timesResp : []
+    const rawPairs = Array.isArray(pairsResp) ? pairsResp : []
+
+    if (!rawSlots.length) {
+      showToast({
+        variant: 'warning',
+        title: 'Не найдены слоты звонков.',
+        description: 'Сначала заполните раздел «Звонки», затем вернитесь к ручному редактированию.',
+        code: 'UI-SCH-001',
+      })
+      setTimeSlots([])
+      setCells({})
+      setInitialCells({})
+      return
+    }
+
+    const slots = rawSlots
+      .map(slot => ({
+        id: Number(slot.id),
+        time: Number(slot.time),
+        label: `${slot.time_start ?? '--:--'} - ${slot.time_end ?? '--:--'}`,
+      }))
+      .filter(slot => !Number.isNaN(slot.id))
+      .sort((a, b) => {
+        const left = Number.isNaN(a.time) ? Number.MAX_SAFE_INTEGER : a.time
+        const right = Number.isNaN(b.time) ? Number.MAX_SAFE_INTEGER : b.time
+        return left - right
+      })
+
+    const nextCells = buildPlannerState(slots, rawPairs)
+    setTimeSlots(slots)
+    setCells(nextCells)
+    setInitialCells(JSON.parse(JSON.stringify(nextCells)))
+
+    if (!rawPairs.length) {
+      showToast({
+        variant: 'info',
+        title: 'Расписание на выбранную неделю не найдено.',
+        description: 'Отображена пустая таблица для наполнения.',
+      })
+    }
+  }
+
+  useEffect(() => {
+    loadWeekSchedule()
+  }, [course, group, weekNumber])
+
+  const updateCell = (slotId, weekday, field, value) => {
+    const key = `${slotId}-${weekday}`
+    setCells(prev => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] ?? emptyPlannerCell()),
+        [field]: value,
+      },
+    }))
+  }
 
   const submitManual = async () => {
-    if (!group.trim()) {
-      showToast({ variant: 'warning', title: 'Укажите группу.', code: 'UI-SCH-001' });
-      return;
+    const parsedCourse = parseInt(course, 10)
+    const parsedWeek = parseInt(weekNumber, 10)
+    const safeGroup = group.trim()
+
+    if (!safeGroup) {
+      showToast({ variant: 'warning', title: 'Укажите группу.', code: 'UI-SCH-002' })
+      return
     }
-
-    const cleaned = lessons
-      .map((item) => ({ ...item, method: 'create' }))
-      .filter((item) => item.time || item.subject || item.teacher || item.auditory || item.type);
-
-    if (!cleaned.length) {
-      showToast({ variant: 'warning', title: 'Добавьте хотя бы одну строку пары.', code: 'UI-SCH-002' });
-      return;
-    }
-
-    setLoading(true);
-    let resp;
-    const parsedCourse = parseInt(course, 10);
-    const parsedWeek = parseInt(weekNumber, 10);
     if (Number.isNaN(parsedCourse)) {
-      setLoading(false);
-      showToast({ variant: 'warning', title: 'Курс должен быть числом.', code: 'UI-SCH-003' });
-      return;
+      showToast({ variant: 'warning', title: 'Курс должен быть числом.', code: 'UI-SCH-003' })
+      return
     }
     if (Number.isNaN(parsedWeek)) {
-      setLoading(false);
-      showToast({ variant: 'warning', title: 'Номер недели должен быть числом.', code: 'UI-SCH-004' });
-      return;
+      showToast({ variant: 'warning', title: 'Номер недели должен быть числом.', code: 'UI-SCH-004' })
+      return
+    }
+    if (!timeSlots.length) {
+      showToast({ variant: 'warning', title: 'Нет слотов звонков для заполнения таблицы.', code: 'UI-SCH-005' })
+      return
+    }
+
+    const requests = []
+
+    for (const weekday of WEEKDAY_NUMBERS) {
+      const lessons = []
+
+      for (const slot of timeSlots) {
+        const key = `${slot.id}-${weekday}`
+        const current = cells[key] ?? emptyPlannerCell()
+        const initial = initialCells[key] ?? emptyPlannerCell()
+
+        const currentFilled = plannerCellHasContent(current)
+        const initialFilled = plannerCellHasContent(initial)
+
+        if (initial.id) {
+          if (!currentFilled) {
+            lessons.push({ id: initial.id, method: 'delete' })
+            continue
+          }
+
+          const changed =
+            normalizeCellValue(current.type) !== normalizeCellValue(initial.type) ||
+            normalizeCellValue(current.subject) !== normalizeCellValue(initial.subject) ||
+            normalizeCellValue(current.teacher) !== normalizeCellValue(initial.teacher) ||
+            normalizeCellValue(current.auditory) !== normalizeCellValue(initial.auditory)
+
+          if (changed) {
+            lessons.push({
+              id: initial.id,
+              time: slot.id,
+              type: normalizeCellValue(current.type) || null,
+              subject: normalizeCellValue(current.subject) || null,
+              teacher: normalizeCellValue(current.teacher) || null,
+              auditory: normalizeCellValue(current.auditory) || null,
+              method: 'update',
+            })
+          }
+          continue
+        }
+
+        if (currentFilled && !initialFilled) {
+          lessons.push({
+            time: slot.id,
+            type: normalizeCellValue(current.type) || null,
+            subject: normalizeCellValue(current.subject) || null,
+            teacher: normalizeCellValue(current.teacher) || null,
+            auditory: normalizeCellValue(current.auditory) || null,
+            method: 'create',
+          })
+        }
+      }
+
+      if (lessons.length) {
+        requests.push({ weekday, lessons })
+      }
+    }
+
+    if (!requests.length) {
+      showToast({ variant: 'info', title: 'Изменений для сохранения нет.' })
+      return
     }
 
     const accepted = await confirm({
       title: 'Сохранение расписания',
-      message: `Сохранить расписание для группы ${group.trim()} на неделю ${parsedWeek}?`,
+      message: `Сохранить изменения для группы ${safeGroup} на неделю ${parsedWeek}?`,
       confirmText: 'Сохранить',
     })
-    if (!accepted) {
-      setLoading(false)
-      return
-    }
+    if (!accepted) return
 
-    for (const chunk of groupedWeekRows) {
-      const filteredLessons = chunk.rows
-        .map(item => ({ ...item, method: 'create' }))
-        .filter(item => item.time || item.subject || item.teacher || item.auditory || item.type)
-        .map(({ weekday: ignoredWeekday, ...rest }) => rest)
+    setSaving(true)
 
-      if (!filteredLessons.length) continue
-
-      const payload = {
-        group: group.trim(),
+    for (const chunk of requests) {
+      const resp = await api.updatePairs({
+        group: safeGroup,
         course: parsedCourse,
         week_number: parsedWeek,
-        weekday: chunk.day,
-        lessons: filteredLessons,
-      };
-      resp = await api.updatePairs(payload);
-      if (!resp?.ok) break;
+        weekday: chunk.weekday,
+        lessons: chunk.lessons,
+      })
+
+      if (!resp?.ok) {
+        setSaving(false)
+        showToast({
+          variant: 'error',
+          title: 'Не удалось сохранить расписание.',
+          description: resp?.error || '',
+          code: resp?.errorCode || 'UI-SCH-006',
+        })
+        return
+      }
     }
 
-    setLoading(false);
-    if (!resp?.ok) {
-      showToast({
-        variant: 'error',
-        title: 'Не удалось сохранить расписание.',
-        description: resp?.error || '',
-        code: resp?.errorCode || 'UI-SCH-005',
-      });
-      return;
-    }
-    showToast({ variant: 'success', title: 'Расписание сохранено.' });
-  };
+    setSaving(false)
+    showToast({ variant: 'success', title: 'Расписание сохранено.' })
+    loadWeekSchedule()
+  }
 
   return (
     <div className="card">
@@ -226,41 +374,73 @@ function ManualTab() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>День</th>
-                  <th>Время</th>
-                  <th>Тип</th>
-                  <th>Предмет</th>
-                  <th>Преподаватель</th>
-                  <th>Аудитория</th>
-                  <th />
+                  <th style={{ minWidth: 160 }}>Время</th>
+                  {WEEKDAYS.map(day => (
+                    <th key={day} style={{ minWidth: 220 }}>{day}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {lessons.map((row, i) => (
-                  <tr key={i}>
+                {timeSlots.map(slot => (
+                  <tr key={slot.id}>
                     <td>
-                      <select className="select" value={row.weekday || 'Понедельник'} onChange={e => updateLesson(i, 'weekday', e.target.value)}>
-                        {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        <strong>Пара {Number.isNaN(slot.time) ? '—' : slot.time}</strong>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{slot.label}</span>
+                      </div>
                     </td>
-                    <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30 или id" /></td>
-                    <td><input className="input" value={row.type} onChange={e => updateLesson(i, 'type', e.target.value)} placeholder="лекция" /></td>
-                    <td><input className="input" value={row.subject} onChange={e => updateLesson(i, 'subject', e.target.value)} placeholder="Математика" /></td>
-                    <td><input className="input" value={row.teacher} onChange={e => updateLesson(i, 'teacher', e.target.value)} placeholder="Иванов И.И." /></td>
-                    <td><input className="input" value={row.auditory} onChange={e => updateLesson(i, 'auditory', e.target.value)} placeholder="204" /></td>
-                    <td>
-                      <button className="btn btn-ghost" onClick={() => removeLesson(i)} disabled={lessons.length === 1}>Удалить</button>
-                    </td>
+                    {WEEKDAY_NUMBERS.map(dayNumber => {
+                      const key = `${slot.id}-${dayNumber}`
+                      const cell = cells[key] ?? emptyPlannerCell()
+
+                      return (
+                        <td key={key}>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <input
+                              className="input"
+                              value={cell.type}
+                              onChange={e => updateCell(slot.id, dayNumber, 'type', e.target.value)}
+                              placeholder="Тип"
+                            />
+                            <input
+                              className="input"
+                              value={cell.subject}
+                              onChange={e => updateCell(slot.id, dayNumber, 'subject', e.target.value)}
+                              placeholder="Предмет"
+                            />
+                            <input
+                              className="input"
+                              value={cell.teacher}
+                              onChange={e => updateCell(slot.id, dayNumber, 'teacher', e.target.value)}
+                              placeholder="Преподаватель"
+                            />
+                            <input
+                              className="input"
+                              value={cell.auditory}
+                              onChange={e => updateCell(slot.id, dayNumber, 'auditory', e.target.value)}
+                              placeholder="Аудитория"
+                            />
+                          </div>
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
+                {!loadingWeek && !timeSlots.length ? (
+                  <tr>
+                    <td colSpan={7} className="table-empty">Нет слотов звонков. Заполните раздел «Звонки».</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-            <button className="btn" onClick={addLesson}>Добавить строку</button>
-            <button className="btn btn-primary" onClick={submitManual} disabled={loading}>
-              {loading ? 'Сохранение...' : 'Сохранить расписание'}
+            <button className="btn" onClick={loadWeekSchedule} disabled={loadingWeek || saving}>
+              {loadingWeek ? 'Загрузка...' : 'Перезагрузить неделю'}
+            </button>
+            <button className="btn btn-primary" onClick={submitManual} disabled={saving || loadingWeek || !timeSlots.length}>
+              {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
           </div>
         </div>
