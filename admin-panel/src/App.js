@@ -12,6 +12,7 @@ import UsersScreen from './screens/UsersScreen';
 import AppearanceScreen from './screens/AppearanceScreen';
 import UnifiedWindowScreen from './screens/UnifiedWindowScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import LoginHistoryScreen from './screens/LoginHistoryScreen';
 import SystemInfoScreen from './screens/SystemInfoScreen';
 import BrandMark from './components/BrandMark';
 import { ADMIN_UI } from './constants';
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/times',     icon: 'alarm-outline',          label: 'Звонки', requiredPerms: ['times:write'] },
   { to: '/news',      icon: 'newspaper-outline',      label: 'Новости', requiredPerms: ['news:write'] },
   { to: '/users',     icon: 'people-outline',         label: 'Пользователи', requiredPerms: ['users:write'] },
+  { to: '/login-history', icon: 'log-in-outline',    label: 'История входов', requiredPerms: ['users:read'] },
   { to: '/unified-window', icon: 'mail-open-outline', label: 'Единое окно', requiredPerms: ['unified_window:write'] },
 ];
 
