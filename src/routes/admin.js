@@ -151,7 +151,7 @@ function buildAgentDisplayName(user) {
 }
 
 function getLastScheduleDate() {
-  const row = pairsDb.prepare('SELECT MAX(date) AS max_date FROM pairs WHERE date IS NOT NULL AND TRIM(date) != ""').get()
+  const row = pairsDb.prepare("SELECT MAX(date) AS max_date FROM pairs WHERE date IS NOT NULL AND TRIM(date) != ''").get()
   return row?.max_date ?? null
 }
 
@@ -843,6 +843,49 @@ router.post('/catalog/groups', requireAuth, requirePermission('schedule:write'),
     .run(course, groupName, now)
 
   res.json({ ok: true, inserted: result.changes > 0 })
+})
+
+router.patch('/catalog/groups/:id', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const id = parseInt(req.params.id, 10)
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid group id' })
+
+  const nextCourse = req.body?.course !== undefined ? parseInt(req.body.course, 10) : null
+  const nextGroupName = normalizeNullableText(req.body?.group_name, 120)
+
+  if (nextCourse !== null && (Number.isNaN(nextCourse) || nextCourse < -1 || nextCourse > 10)) {
+    return res.status(400).json({ error: 'course must be an integer between -1 and 10' })
+  }
+  if (!nextGroupName) {
+    return res.status(400).json({ error: 'group_name is required' })
+  }
+
+  const current = pairsDb.prepare('SELECT id, course FROM group_catalog WHERE id = ?').get(id)
+  if (!current) return res.status(404).json({ error: 'Group not found' })
+
+  const targetCourse = nextCourse ?? current.course
+  const duplicate = pairsDb
+    .prepare('SELECT id FROM group_catalog WHERE course = ? AND group_name = ? AND id != ?')
+    .get(targetCourse, nextGroupName, id)
+  if (duplicate) {
+    return res.status(409).json({ error: 'Group already exists in this course' })
+  }
+
+  const result = pairsDb
+    .prepare('UPDATE group_catalog SET course = ?, group_name = ? WHERE id = ?')
+    .run(targetCourse, nextGroupName, id)
+
+  if (!result.changes) return res.status(404).json({ error: 'Group not found' })
+  res.json({ ok: true })
+})
+
+router.delete('/catalog/groups/:id', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const id = parseInt(req.params.id, 10)
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid group id' })
+
+  const result = pairsDb.prepare('DELETE FROM group_catalog WHERE id = ?').run(id)
+  if (!result.changes) return res.status(404).json({ error: 'Group not found' })
+
+  res.json({ ok: true })
 })
 
 // ---------------------------------------------------------------------------

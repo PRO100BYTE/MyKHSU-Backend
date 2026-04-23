@@ -101,6 +101,8 @@ const api = {
   createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
   getCatalogGroups: (course) => request('GET', `/catalog/groups${course !== undefined && course !== '' ? `?course=${course}` : ''}`),
   createCatalogGroup: (payload) => request('POST', '/catalog/groups', payload),
+  updateCatalogGroup: (id, payload) => request('PATCH', `/catalog/groups/${id}`, payload),
+  deleteCatalogGroup: (id) => request('DELETE', `/catalog/groups/${id}`),
 
   // Звонки
   updateTimes: (items) => request('POST', '/updatetimes', items),
