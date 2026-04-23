@@ -175,6 +175,7 @@
 | `is_active` | INTEGER NOT NULL DEFAULT 1 | Статус учётной записи (1=активен, 0=отключён) |
 | `role` | TEXT NOT NULL DEFAULT `admin` | Роль пользователя админки |
 | `first_name` | TEXT | Имя пользователя |
+| `middle_name` | TEXT | Отчество пользователя (необязательно) |
 | `last_name` | TEXT | Фамилия пользователя |
 | `position` | TEXT | Должность |
 | `email` | TEXT | Email для уведомлений/восстановления |

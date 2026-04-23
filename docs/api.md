@@ -132,6 +132,8 @@
 
 Создать обращение в модуле «Единое окно» (доступно без авторизации).
 
+`contact_email` обязателен: этот email используется для последующего поиска обращений.
+
 ```json
 // Request
 {
@@ -245,6 +247,25 @@
 // Error (если обращение закрыто)
 { "error": "Ticket is closed" }
 ```
+
+---
+
+### POST `/api/unified-window/tickets/{token}/close`
+
+Закрыть обращение пользователем с обязательным комментарием.
+
+```json
+// Request
+{
+  "comment": "Вопрос решен, закрываю обращение",
+  "contact_name": "Иван Иванов"
+}
+
+// Response
+{ "ok": true }
+```
+
+Если `comment` пустой, сервер возвращает `400` с ошибкой `comment is required`.
 
 ---
 
@@ -412,6 +433,7 @@
   "id": 1,
   "username": "admin",
   "first_name": "Иван",
+  "middle_name": "Иванович",
   "last_name": "Иванов",
   "position": "Методист",
   "email": "admin@khsu.ru",
@@ -432,6 +454,7 @@
 {
   "username": "admin",
   "first_name": "Иван",
+  "middle_name": "Иванович",
   "last_name": "Иванов",
   "position": "Заведующий отделением",
   "email": "admin@khsu.ru",
@@ -460,6 +483,7 @@
     "is_active": true,
     "role": "admin",
     "first_name": "Иван",
+    "middle_name": "Иванович",
     "last_name": "Иванов",
     "position": "Методист",
     "email": "admin@khsu.ru",
@@ -483,6 +507,7 @@
   "is_active": true,
   "role": "manager",
   "first_name": "Иван",
+  "middle_name": "Иванович",
   "last_name": "Иванов",
   "position": "Методист",
   "email": "ivan@khsu.ru"
@@ -506,6 +531,7 @@
   "is_active": true,
   "role": "news_editor",
   "first_name": "Петр",
+  "middle_name": "Петрович",
   "last_name": "Петров",
   "position": "Редактор",
   "email": "petrov@khsu.ru"
@@ -756,7 +782,31 @@ CRUD для расписания звонков. Body — массив:
 
 ---
 
-### PATCH `/adminapi/unified-window/tickets/{id}`
+### GET `/adminapi/unified-window/tickets/{id}`
+
+Получить детали одного обращения, включая переписку, историю статусов и список вложений.
+
+---
+
+### POST `/adminapi/unified-window/tickets/{id}/messages`
+
+Добавить сообщение от агента в переписку обращения.
+
+```json
+// Request
+{
+  "text": "Здравствуйте, приняли обращение в работу"
+}
+
+// Response
+{ "ok": true, "id": 101 }
+```
+
+Поле `author_name` в сообщении записывается в формате `Фамилия И.О.` (если доступны данные профиля агента).
+
+---
+
+### PATCH `/adminapi/unified-window/tickets/{id}/status`
 
 Обновление статуса и комментариев обращения.
 
@@ -764,16 +814,14 @@ CRUD для расписания звонков. Body — массив:
 // Request
 {
   "status": "in_progress",
-  "assignee": "admin",
-  "response_text": "Принято в работу",
-  "internal_note": "Проверить до конца дня"
+  "comment": "Взято в работу"
 }
 
 // Response
 { "ok": true }
 ```
 
-`status`: `new` | `in_progress` | `resolved` | `closed`
+`status`: `open` | `in_progress` | `resolved` | `closed`
 
 ---
 

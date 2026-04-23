@@ -1638,7 +1638,7 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
 @media (max-width: 1100px) {
   .uw-admin-layout {
     grid-template-columns: 1fr;
-    min-height: auto;
+    min-height: 0;
   }
 
   .uw-admin-tickets {
