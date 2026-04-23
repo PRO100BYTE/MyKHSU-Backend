@@ -1736,7 +1736,16 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   align-items: center;
   justify-content: center;
   padding: 24px;
-  animation: fadeIn 0.2s ease-out;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.modal-overlay--open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 .modal {
   background: var(--background-elevated);
@@ -1747,7 +1756,14 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 0;
+  transform: translateY(18px) scale(0.98);
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-overlay--open .modal {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 .modal__header {
   padding: 20px;
