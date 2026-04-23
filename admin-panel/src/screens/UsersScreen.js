@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { formatDateTimeKrasnoyarsk } from '../utils/datetime';
 
 const EMPTY_FORM = {
   username: '',
@@ -436,8 +437,5 @@ export default function UsersScreen() {
 }
 
 function formatDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString('ru-RU');
+  return formatDateTimeKrasnoyarsk(value, '—');
 }

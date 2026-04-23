@@ -87,8 +87,14 @@ export const ADMIN_UI = {
 };
 
 export const BUILD_INFO_FALLBACK = {
-  api_version: '1.1.0',
-  app_version: '1.1.0',
-  build_number: '2026.04.22.1',
-  build_date: '2026-04-22T00:00:00.000Z',
+  api_version: process.env.REACT_APP_API_VERSION || '1.1.0',
+  app_version: process.env.REACT_APP_APP_VERSION || '1.1.0',
+  admin_panel_version: process.env.REACT_APP_ADMIN_PANEL_VERSION || '1.1.0',
+  frontend_version: process.env.REACT_APP_FRONTEND_VERSION || '1.1.0',
+  build_number: process.env.REACT_APP_BUILD_NUMBER || '2026.04.22.1',
+  build_date: process.env.REACT_APP_BUILD_DATE || '2026-04-22T00:00:00+07:00',
+  build_date_human: process.env.REACT_APP_BUILD_DATE_HUMAN || '22.04.2026, 00:00:00',
+  git_commit_hash: process.env.REACT_APP_GIT_COMMIT_HASH || 'unknown',
+  build_timezone: process.env.REACT_APP_BUILD_TIMEZONE || 'Asia/Krasnoyarsk',
+  build_timezone_label: process.env.REACT_APP_BUILD_TIMEZONE_LABEL || 'Asia/Krasnoyarsk (GMT+7)',
 };

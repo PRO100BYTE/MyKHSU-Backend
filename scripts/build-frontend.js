@@ -24,6 +24,9 @@ const DEST = path.join(ROOT, 'web-build');
 const ADMIN_SOURCE = path.join(ROOT, 'admin-panel');
 const ADMIN_DEST = path.join(DEST, 'admin-panel');
 
+console.log('[build-meta] Синхронизируем версии/хэш/дату сборки...');
+execSync('node scripts/sync-build-info.js', { cwd: ROOT, stdio: 'inherit' });
+
 function findWebSource() {
   const rawArgs = process.argv.slice(2).filter(arg => arg !== '--optional');
   const fromArg = rawArgs[0];

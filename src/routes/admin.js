@@ -10,6 +10,13 @@ import { normalizeDate } from '../utils/dates.js';
 import { hasPermission, USER_ROLES } from '../utils/permissions.js';
 import { encryptText, decryptText, encryptBuffer, decryptBuffer } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
+import {
+  nowKrasnoyarskSql,
+  plusHoursKrasnoyarskSql,
+  formatKrasnoyarskSql,
+  formatKrasnoyarskHuman,
+  KRASNOYARSK_TIME_ZONE_LABEL,
+} from '../utils/time.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -18,7 +25,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 const uploadUw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 function nowSql() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return nowKrasnoyarskSql();
 }
 
 function sendAdminError(res, status, code, error) {
@@ -46,8 +53,7 @@ function requirePermission(permission) {
 function getDueAtByPriority(priority) {
   const hoursMap = { urgent: 4, high: 24, normal: 72, low: 168 }
   const hours = hoursMap[priority] ?? 72
-  const due = new Date(Date.now() + hours * 60 * 60 * 1000)
-  return due.toISOString().slice(0, 19).replace('T', ' ')
+  return plusHoursKrasnoyarskSql(hours)
 }
 
 /**
@@ -213,8 +219,8 @@ function getUnifiedWindowOverview() {
 
 function getNewsOverview() {
   const nowIso = nowSql()
-  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
-  const eightWeeksAgoIso = new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  const monthAgoIso = formatKrasnoyarskSql(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+  const eightWeeksAgoIso = formatKrasnoyarskSql(new Date(Date.now() - 56 * 24 * 60 * 60 * 1000))
 
   const totalRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM news').get()
   const monthRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM news WHERE date >= ?').get(monthAgoIso)
@@ -284,6 +290,47 @@ function getSectionFreshness() {
     scheduleFilledToDate: schedule.filledToDate,
     newsLastPublishedAt: news.lastPublishedAt,
     unifiedWindowLastActivityAt: uwLastMessage?.last_message_at ?? null,
+  }
+}
+
+function getSystemOverview() {
+  const pairsCount = pairsDb.prepare('SELECT COUNT(*) AS count FROM pairs').get()
+  const timesCount = pairsDb.prepare('SELECT COUNT(*) AS count FROM times').get()
+  const newsCount = pairsDb.prepare('SELECT COUNT(*) AS count FROM news').get()
+  const usersCount = usersDb.prepare('SELECT COUNT(*) AS count FROM users').get()
+  const uwTicketsCount = usersDb.prepare('SELECT COUNT(*) AS count FROM unified_window_tickets').get()
+  const uwMessagesCount = usersDb.prepare('SELECT COUNT(*) AS count FROM unified_window_messages').get()
+  const uwFilesCount = usersDb.prepare('SELECT COUNT(*) AS count FROM unified_window_files').get()
+  const uwHistoryCount = usersDb.prepare('SELECT COUNT(*) AS count FROM unified_window_status_history').get()
+
+  const memory = process.memoryUsage()
+
+  return {
+    timezone: KRASNOYARSK_TIME_ZONE_LABEL,
+    generatedAt: nowSql(),
+    generatedAtHuman: formatKrasnoyarskHuman(new Date()),
+    runtime: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      uptimeSeconds: Math.floor(process.uptime()),
+      memoryMb: {
+        rss: Number((memory.rss / 1024 / 1024).toFixed(2)),
+        heapUsed: Number((memory.heapUsed / 1024 / 1024).toFixed(2)),
+        heapTotal: Number((memory.heapTotal / 1024 / 1024).toFixed(2)),
+      },
+    },
+    entities: {
+      pairs: Number(pairsCount?.count || 0),
+      times: Number(timesCount?.count || 0),
+      news: Number(newsCount?.count || 0),
+      users: Number(usersCount?.count || 0),
+      unifiedWindowTickets: Number(uwTicketsCount?.count || 0),
+      unifiedWindowMessages: Number(uwMessagesCount?.count || 0),
+      unifiedWindowFiles: Number(uwFilesCount?.count || 0),
+      unifiedWindowStatusHistory: Number(uwHistoryCount?.count || 0),
+    },
   }
 }
 
@@ -415,6 +462,7 @@ router.get('/dashboard/summary', requireAuth, (req, res) => {
   const schedule = getScheduleOverview()
   const users = getUsersOverview()
   const freshness = getSectionFreshness()
+  const system = getSystemOverview()
 
   let roleSummary = {}
 
@@ -455,6 +503,7 @@ router.get('/dashboard/summary', requireAuth, (req, res) => {
   res.json({
     role,
     roleSummary,
+    system,
     generatedAt: nowSql(),
   })
 })
@@ -1059,11 +1108,7 @@ function updateLastUpdate() {
   let settings = {};
   try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch { /* новый файл */ }
 
-  const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  settings.last_update =
-    `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ` +
-    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  settings.last_update = formatKrasnoyarskHuman(new Date());
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 }

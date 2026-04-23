@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
+import { formatDateTimeKrasnoyarsk } from '../utils/datetime'
 
 const ROLE_LABELS = {
   admin: 'Администратор',
@@ -18,10 +19,7 @@ const STATUS_LABELS = {
 }
 
 function formatDate(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('ru-RU')
+  return formatDateTimeKrasnoyarsk(value, '—')
 }
 
 export default function DashboardScreen() {

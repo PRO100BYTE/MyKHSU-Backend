@@ -12,6 +12,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "prebuild": "node ../scripts/sync-build-info.js --admin-only",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

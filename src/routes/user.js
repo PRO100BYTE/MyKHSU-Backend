@@ -2,8 +2,14 @@ import { Router } from 'express';
 import { pairsDb, usersDb } from '../db/database.js';
 import { getWeekDates, getCurrentWeekNumber, normalizeDate } from '../utils/dates.js';
 import { APP_CONSTANTS } from '../constants.js';
+import { BUILD_INFO } from '../build-info.generated.js';
 import { encryptText, decryptText, createAccessToken } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
+import {
+  nowKrasnoyarskSql,
+  plusHoursKrasnoyarskSql,
+  KRASNOYARSK_TIME_ZONE_LABEL,
+} from '../utils/time.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +27,11 @@ router.get('/meta', (_req, res) => {
     api_version: APP_CONSTANTS.apiVersion,
     app_version: APP_CONSTANTS.appVersion,
     build_number: APP_CONSTANTS.buildNumber,
-    build_date: APP_CONSTANTS.buildDate,
+    build_date: BUILD_INFO.buildDate,
+    build_date_human: BUILD_INFO.buildDateHuman,
+    git_commit_hash: BUILD_INFO.gitCommitHash,
+    build_timezone: BUILD_INFO.buildTimeZone,
+    build_timezone_label: BUILD_INFO.buildTimeZoneLabel ?? KRASNOYARSK_TIME_ZONE_LABEL,
     admin_panel_version: APP_CONSTANTS.adminPanelVersion,
     frontend_version: APP_CONSTANTS.frontendVersion,
     contacts: APP_CONSTANTS.contacts,
@@ -370,13 +380,13 @@ export default router;
 // ---------------------------------------------------------------------------
 
 function uwNowSql() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ')
+  return nowKrasnoyarskSql()
 }
 
 function uwDueAt(priority) {
   const hoursMap = { urgent: 4, high: 24, normal: 72, low: 168 }
   const hours = hoursMap[priority] ?? 72
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  return plusHoursKrasnoyarskSql(hours)
 }
 
 function normalizeNullableText(value, maxLen = 255) {

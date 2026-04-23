@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import { useToast } from '../context/ToastContext'
 import { useConfirmDialog } from '../context/ConfirmDialogContext'
+import { formatDateTimeKrasnoyarsk } from '../utils/datetime'
 
 const STATUSES = [
   { value: '', label: 'Все статусы' },
@@ -30,10 +31,7 @@ const LAST_AUTHOR_LABELS = {
 }
 
 function formatDate(value) {
-  if (!value) return 'Неизвестно'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('ru-RU')
+  return formatDateTimeKrasnoyarsk(value, 'Неизвестно')
 }
 
 function getMessageAuthor(message) {

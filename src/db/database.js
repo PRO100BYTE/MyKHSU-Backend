@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
+import { nowKrasnoyarskSql } from '../utils/time.js';
 
 function ensureDir(filePath) {
   const dir = path.dirname(filePath);
@@ -89,7 +90,7 @@ function initPairsSchema(db) {
     db.exec('ALTER TABLE pairs ADD COLUMN date TEXT');
   }
 
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = nowKrasnoyarskSql();
   db.prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) SELECT DISTINCT course, ? FROM pairs WHERE course IS NOT NULL').run(now);
   db.prepare(
     `INSERT OR IGNORE INTO group_catalog (course, group_name, created_at)
@@ -258,7 +259,7 @@ function initUsersSchema(db) {
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash)');
 
-  const now = new Date().toISOString();
+  const now = nowKrasnoyarskSql();
   db.prepare('UPDATE users SET created_at = COALESCE(created_at, ?), updated_at = COALESCE(updated_at, ?)').run(now, now);
 }
 
