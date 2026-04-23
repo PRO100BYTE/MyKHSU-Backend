@@ -1,24 +1,43 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import BrandMark from '../components/BrandMark';
 import { ADMIN_UI } from '../constants';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!username || !password) { setError('Введите логин и пароль'); return; }
+    if (!username || !password) {
+      showToast({
+        variant: 'warning',
+        title: 'Введите логин и пароль.',
+        code: 'UI-AUTH-003',
+      });
+      return;
+    }
     setLoading(true);
-    setError('');
     const res = await login(username, password);
     setLoading(false);
-    if (!res.ok) setError(res.error);
+
+    if (res.ok) {
+      showToast({ variant: 'success', title: res.message || 'Авторизация прошла успешно.' });
+      return;
+    }
+
+    showToast({
+      variant: 'error',
+      title: res.message || 'Произошла неопознанная ошибка. Повторите попытку, либо обратитесь к администратору.',
+      description: res.description || '',
+      code: res.code || 'UI-AUTH-002',
+      duration: 8000,
+    });
   }
 
   return (
@@ -34,8 +53,6 @@ export default function LoginScreen() {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
-          {error && <div className="login-error">{error}</div>}
-
           <div className="form-group">
             <label className="form-label">Логин</label>
             <div className="input-with-icon">

@@ -21,6 +21,10 @@ function nowSql() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function sendAdminError(res, status, code, error) {
+  return res.status(status).json({ code, error })
+}
+
 /**
  * Middleware: проверяет разрешение у аутентифицированного пользователя.
  * @param {string} permission
@@ -28,7 +32,7 @@ function nowSql() {
 function requirePermission(permission) {
   return (req, res, next) => {
     if (!hasPermission(req.user?.role, permission)) {
-      return res.status(403).json({ error: 'Forbidden: insufficient permissions' })
+      return sendAdminError(res, 403, 'ADM-AUTH-004', 'Forbidden: insufficient permissions')
     }
     next()
   }
@@ -181,22 +185,22 @@ function resolveTimeId(rawTime) {
 router.post('/login', async (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'username and password are required' });
+    return sendAdminError(res, 400, 'ADM-AUTH-001', 'username and password are required');
   }
 
   const user = usersDb.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return sendAdminError(res, 401, 'ADM-AUTH-002', 'Invalid credentials');
   }
 
   if (!user.is_active) {
-    return res.status(403).json({ error: 'User is disabled' });
+    return sendAdminError(res, 403, 'ADM-AUTH-003', 'User is disabled');
   }
 
   // Argon2id — проверка пароля
   const valid = await argon2.verify(user.password, password);
   if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return sendAdminError(res, 401, 'ADM-AUTH-002', 'Invalid credentials');
   }
 
   const token = jwt.sign(

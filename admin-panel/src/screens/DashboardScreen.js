@@ -1,28 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
 import { BUILD_INFO_FALLBACK } from '../constants';
 
 export default function DashboardScreen() {
+  const { hasPermission } = useAuth();
   const [stats, setStats] = useState(null);
   const [meta, setMeta] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const canReadUnifiedWindow = hasPermission('unified_window:read');
+
     Promise.all([
       api.getLastUpdate(),
       api.getCourses(),
       api.getWeekNumbers(),
       api.getNews(1, 0),
       api.getMeta(),
-      api.getUwTickets({ limit: 5, status: 'open' }),
+      canReadUnifiedWindow ? api.getUwTickets({ limit: 5, status: 'open' }) : Promise.resolve(null),
     ]).then(([lastUpdate, courses, weeks, news, metaInfo, uwTickets]) => {
       setStats({ lastUpdate, courses, weeks, news });
       setMeta(metaInfo);
-      setTickets(Array.isArray(uwTickets) ? uwTickets : []);
+      setTickets(Array.isArray(uwTickets?.data) ? uwTickets.data : []);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [hasPermission]);
 
   if (loading) {
     return (

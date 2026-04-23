@@ -2,6 +2,10 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { usersDb } from '../db/database.js';
 
+function sendAuthError(res, status, code, error) {
+  return res.status(status).json({ code, error })
+}
+
 /**
  * Извлекает JWT токен из заголовков запроса.
  * Поддерживает: Authorization: Bearer <token>  и  Token: <token>
@@ -22,23 +26,23 @@ function extractToken(req) {
 export function requireAuth(req, res, next) {
   const token = extractToken(req);
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: no token provided' });
+    return sendAuthError(res, 401, 'ADM-AUTH-005', 'Unauthorized: no token provided');
   }
 
   try {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
     if (!payload.auth) {
-      return res.status(403).json({ error: 'Forbidden: invalid token claims' });
+      return sendAuthError(res, 403, 'ADM-AUTH-006', 'Forbidden: invalid token claims');
     }
 
     const dbUser = usersDb
       .prepare('SELECT id, username, is_active, role, first_name, last_name, position, email FROM users WHERE id = ?')
       .get(payload.uid);
     if (!dbUser) {
-      return res.status(401).json({ error: 'Unauthorized: user not found' });
+      return sendAuthError(res, 401, 'ADM-AUTH-007', 'Unauthorized: user not found');
     }
     if (!dbUser.is_active) {
-      return res.status(403).json({ error: 'Forbidden: user is disabled' });
+      return sendAuthError(res, 403, 'ADM-AUTH-003', 'Forbidden: user is disabled');
     }
 
     req.user = {
@@ -52,6 +56,6 @@ export function requireAuth(req, res, next) {
     };
     next();
   } catch {
-    return res.status(401).json({ error: 'Unauthorized: invalid or expired token' });
+    return sendAuthError(res, 401, 'ADM-AUTH-008', 'Unauthorized: invalid or expired token');
   }
 }

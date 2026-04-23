@@ -4,29 +4,70 @@ function getToken() {
   return localStorage.getItem('admin_token');
 }
 
+function getResponseError(data, fallbackError) {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return {
+      error: typeof data.error === 'string' && data.error.trim() ? data.error : fallbackError,
+      code: typeof data.code === 'string' && data.code.trim() ? data.code : '',
+    };
+  }
+
+  if (typeof data === 'string' && data.trim()) {
+    return { error: data, code: '' };
+  }
+
+  return { error: fallbackError, code: '' };
+}
+
 async function request(method, path, body, isFormData = false) {
   const headers = {};
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (!isFormData && body) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
-  });
-
-  if (res.status === 401 || res.status === 403) {
-    localStorage.removeItem('admin_token');
-    window.location.href = '/admin-panel/login';
-    return null;
-  }
-
-  const text = await res.text();
   try {
-    return { ok: res.ok, status: res.status, data: JSON.parse(text) };
-  } catch {
-    return { ok: res.ok, status: res.status, data: text };
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
+    });
+
+    const text = await res.text();
+    let data = text;
+
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+
+    const { error, code } = getResponseError(data, `HTTP ${res.status}`);
+
+    if (res.status === 401 && token && path !== '/login') {
+      localStorage.removeItem('admin_token');
+      window.dispatchEvent(new CustomEvent('admin-auth-expired', {
+        detail: {
+          error,
+          code: code || 'ADM-AUTH-008',
+        },
+      }));
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      data,
+      error: res.ok ? '' : error,
+      errorCode: res.ok ? '' : code,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: error instanceof Error ? error.message : 'Network request failed',
+      errorCode: 'UI-NET-001',
+    };
   }
 }
 

@@ -363,11 +363,14 @@
 // Response 200
 { "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
 
+// Response 400
+{ "code": "ADM-AUTH-001", "error": "username and password are required" }
+
 // Response 401
-{ "error": "Invalid credentials" }
+{ "code": "ADM-AUTH-002", "error": "Invalid credentials" }
 
 // Response 403
-{ "error": "User is disabled" }
+{ "code": "ADM-AUTH-003", "error": "User is disabled" }
 
 // Response 503
 { "error": "Admin users are not configured. Run: npm run seed or npm run users:create -- <username> <password> true" }
@@ -375,13 +378,28 @@
 
 Токен действителен **24 часа**.
 
+Коды ошибок авторизации:
+
+| Код | HTTP | Где возникает | Значение |
+|---|---|---|---|
+| `ADM-AUTH-001` | 400 | `POST /adminapi/login` | Не передан логин или пароль |
+| `ADM-AUTH-002` | 401 | `POST /adminapi/login` | Неверные учетные данные |
+| `ADM-AUTH-003` | 403 | `POST /adminapi/login`, `POST /adminapi/checktoken`, любые защищенные маршруты | Учетная запись отключена |
+| `ADM-AUTH-004` | 403 | Любой маршрут с проверкой прав | Недостаточно прав для выполнения действия |
+| `ADM-AUTH-005` | 401 | Любой защищенный маршрут | JWT-токен не передан |
+| `ADM-AUTH-006` | 403 | Любой защищенный маршрут | Токен имеет некорректные claims |
+| `ADM-AUTH-007` | 401 | Любой защищенный маршрут | Пользователь из токена не найден |
+| `ADM-AUTH-008` | 401 | Любой защищенный маршрут | Токен недействителен или истек |
+
 ---
 
 ### POST `/adminapi/checktoken`
 
 Проверить токен.
 
-**Response 200:** `{ "valid": true, "user": { "uid": 1, "username": "admin" } }`
+**Response 200:** `{ "valid": true, "user": { "uid": 1, "username": "admin" }, "permissions": ["news:read", "news:write"] }`
+
+Ошибки возвращаются в формате `{ "code": "ADM-AUTH-00X", "error": "..." }`.
 
 ---
 
