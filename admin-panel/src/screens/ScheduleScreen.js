@@ -98,12 +98,17 @@ function ManualTab() {
 
   const loadWeekDates = async (value = weekNumber) => {
     const parsedWeek = parseInt(value, 10)
+    const parsedCourse = parseInt(course, 10)
+    const safeGroup = String(group || '').trim()
     if (Number.isNaN(parsedWeek)) {
       setWeekDates({})
       return
     }
 
-    const resp = await api.getDates(parsedWeek)
+    const resp = await api.getDates(parsedWeek, {
+      course: Number.isNaN(parsedCourse) ? undefined : parsedCourse,
+      group: safeGroup || undefined,
+    })
     if (!Array.isArray(resp)) {
       setWeekDates({})
       return
@@ -247,7 +252,7 @@ function ManualTab() {
 
   useEffect(() => {
     loadWeekDates(weekNumber)
-  }, [weekNumber])
+  }, [weekNumber, course, group])
 
   const updateCell = (slotId, weekday, field, value) => {
     const key = `${slotId}-${weekday}`

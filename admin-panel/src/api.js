@@ -150,8 +150,16 @@ const api = {
     fetch('/api/getcourses').then(r => r.json()),
   getWeekNumbers: () =>
     fetch('/api/weeknumbers').then(r => r.json()),
-  getDates: (week) =>
-    fetch(`/api/getdates?week=${encodeURIComponent(week)}`).then(r => r.json()),
+  getDates: (week, filters = {}) => {
+    const qs = new URLSearchParams({ week: String(week) })
+    if (filters.course !== undefined && filters.course !== null && filters.course !== '') {
+      qs.set('course', String(filters.course))
+    }
+    if (filters.group !== undefined && filters.group !== null && String(filters.group).trim() !== '') {
+      qs.set('group', String(filters.group).trim())
+    }
+    return fetch(`/api/getdates?${qs.toString()}`).then(r => r.json())
+  },
   getPairsTime: () =>
     fetch('/api/getpairstime?include_id=true').then(r => r.json()),
   getNews: (amount = 20, from = 0) =>

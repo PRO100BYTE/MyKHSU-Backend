@@ -305,13 +305,17 @@
 
 ### GET `/api/getdates`
 
-**Query-параметры:** `week` (number)
+**Query-параметры:** `week` (number), `course` (number, необязателен), `group` (string, необязателен)
+
+Для `course/group` endpoint сначала пытается взять границы недели (`date_start/date_end`) из реальных записей `pairs` для указанной недели. Если данных нет, используется расчётный fallback.
 
 **Ответ:** массив дат понедельника—воскресенья: `["2025-04-07", ..., "2025-04-13"]`
 
 ---
 
 ### GET `/api/getdatesextended/{week}`
+
+**Query-параметры:** `course` (number, необязателен), `group` (string, необязателен)
 
 **Ответ:** `{ "date_start": "2025-04-07", "date_end": "2025-04-13" }`
 
