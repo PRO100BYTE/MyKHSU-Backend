@@ -30,6 +30,8 @@ export default function ProfileScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [loginHistory, setLoginHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -47,9 +49,17 @@ export default function ProfileScreen() {
         email: data.email || '',
       }));
       setLoadingProfile(false);
+
+      // Загружаем историю входов текущего пользователя
+      setLoadingHistory(true);
+      const historyResp = await api.getUserLoginHistory(user?.uid, 20, 0);
+      if (mounted && historyResp?.ok) {
+        setLoginHistory(historyResp.data?.data || []);
+      }
+      if (mounted) setLoadingHistory(false);
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [user?.uid]);
 
   const handleSave = async () => {
     setError('');
@@ -206,6 +216,51 @@ export default function ProfileScreen() {
               </label>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Раздел: История входов */}
+      <div className="card profile-card">
+        <div className="card__header">
+          <ion-icon name="log-in-outline" />
+          История входов
+        </div>
+        <div className="card__body">
+          {loadingHistory ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
+              <span className="spinner" />
+            </div>
+          ) : loginHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 30 }}>
+              Нет записей о входах
+            </div>
+          ) : (
+            <div className="login-history-list">
+              {loginHistory.map((entry, idx) => {
+                const timestamp = new Date(entry.login_timestamp);
+                const dateStr = timestamp.toLocaleDateString('ru-RU');
+                const timeStr = timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                return (
+                  <div key={idx} className="login-history-item">
+                    <div className="login-history-item__header">
+                      <div className="login-history-item__date">{dateStr} {timeStr}</div>
+                      <div className="login-history-item__ip">{entry.ip_address || '—'}</div>
+                    </div>
+                    <div className="login-history-item__details">
+                      <div className="login-history-item__device">
+                        {entry.device_os && <span>{entry.device_os}{entry.device_os_version ? ` ${entry.device_os_version}` : ''}</span>}
+                      </div>
+                      <div className="login-history-item__browser">
+                        {entry.browser_name && <span>{entry.browser_name}{entry.browser_version ? ` ${entry.browser_version}` : ''}</span>}
+                      </div>
+                      {entry.device_model && <div className="login-history-item__model">{entry.device_model}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

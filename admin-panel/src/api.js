@@ -136,6 +136,17 @@ const api = {
   enableUser: (id) => request('POST', `/users/${id}/enable`),
   deleteUser: (id) => request('DELETE', `/users/${id}`),
 
+  // История входов
+  getLoginHistory: (limit = 100, offset = 0, userId = null) => {
+    const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (userId) qs.set('userId', String(userId));
+    return request('GET', `/login-history?${qs.toString()}`);
+  },
+  getUserLoginHistory: (userId, limit = 50, offset = 0) =>
+    request('GET', `/users/${userId}/login-history?limit=${limit}&offset=${offset}`),
+  getUserLoginStats: (userId) =>
+    request('GET', `/users/${userId}/login-stats`),
+
   // Единое окно
   getUwTickets: (params = {}) => {
     const qs = new URLSearchParams(
