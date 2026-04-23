@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { useAnimatedVisibility } from '../hooks/useAnimatedVisibility'
 
 const ConfirmDialogContext = createContext(null)
 
@@ -13,6 +14,7 @@ const DEFAULT_OPTIONS = {
 export function ConfirmDialogProvider({ children }) {
   const [dialog, setDialog] = useState(null)
   const resolverRef = useRef(null)
+  const visibility = useAnimatedVisibility(Boolean(dialog))
 
   const closeWithResult = useCallback((result) => {
     const resolver = resolverRef.current
@@ -34,8 +36,8 @@ export function ConfirmDialogProvider({ children }) {
   return (
     <ConfirmDialogContext.Provider value={value}>
       {children}
-      {dialog ? (
-        <div className="modal-overlay" onClick={() => closeWithResult(false)}>
+      {visibility.isRendered && dialog ? (
+        <div className={`modal-overlay${visibility.isVisible ? ' modal-overlay--open' : ''}`} onClick={() => closeWithResult(false)}>
           <div className="modal" onClick={event => event.stopPropagation()}>
             <div className="modal__header">
               <h3 className="modal__title">{dialog.title}</h3>
