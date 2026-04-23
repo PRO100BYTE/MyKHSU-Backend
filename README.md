@@ -140,6 +140,8 @@ MyKHSU-Backend/
 - генерирует `src/build-info.generated.js` для backend;
 - генерирует `.env.production.local` для `admin-panel` и `mykhsu-web`.
 
+Скрипт `scripts/build-frontend.js` определяет корень проекта по собственному пути файла, а не по `cwd` процесса. Это важно для Linux/systemd и ручного запуска через `sudo -u <user> npm run build`, где рабочая директория процесса может отличаться от каталога репозитория.
+
 Для `mykhsu-web` версия приложения (`APP_VERSION`) остается независимой и задается вручную в исходниках web-приложения. Скрипт синхронизирует только build-поля (`REACT_APP_BUILD_VER`, `REACT_APP_BUILD_DATE`, `REACT_APP_BUILD_DATE_ISO`, timezone), при этом `REACT_APP_BUILD_DATE` записывается в формате `DD.MM.YYYY`.
 
 Публичный эндпоинт `GET /api/meta` возвращает:

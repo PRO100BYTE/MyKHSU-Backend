@@ -18,8 +18,10 @@ loadEnv();
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(import.meta.dirname ?? process.cwd(), '..');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '..');
 const DEST = path.join(ROOT, 'web-build');
 const ADMIN_SOURCE = path.join(ROOT, 'admin-panel');
 const ADMIN_DEST = path.join(DEST, 'admin-panel');

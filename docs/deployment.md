@@ -51,6 +51,8 @@ sudo -u mykhsu npm ci --omit=dev
 sudo -u mykhsu npm run build
 ```
 
+Сборочный скрипт `scripts/build-frontend.js` привязан к каталогу самого репозитория и не зависит от текущего `cwd` процесса, поэтому команда `sudo -u mykhsu npm run build` корректно работает и при запуске из systemd/Ubuntu-среды.
+
 ### 3) Настроить env-файл службы
 
 ```bash
