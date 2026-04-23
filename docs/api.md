@@ -826,6 +826,50 @@
 
 ---
 
+### GET `/adminapi/schedule/export`
+
+Экспорт расписания в JSON-формате (совместимом с импортом `Timetable`) для выбранных курса/группы/недели.
+
+**Query-параметры:**
+
+| Параметр | Тип | Обязателен | Описание |
+| --- | --- | --- | --- |
+| `course` | number | ✓ | Номер курса |
+| `group` | string | ✓ | Название группы |
+| `week_number` | number | ✓ | Номер недели |
+
+**Response 200:** JSON-документ вида `{ "Timetable": [...] }` и заголовок `Content-Disposition` для скачивания файла.
+
+---
+
+### POST `/adminapi/schedule/copy`
+
+Копирование расписания из одной комбинации `курс+группа+неделя` в другую.
+
+```json
+// Request
+{
+  "source_course": 2,
+  "source_group": "ИТ-21",
+  "source_week_number": 15,
+  "target_course": 2,
+  "target_group": "ИТ-22",
+  "target_week_number": 16,
+  "replace_target": true
+}
+
+// Response
+{
+  "ok": true,
+  "copied": 24,
+  "replaced": true
+}
+```
+
+`replace_target` по умолчанию `true` (сначала очищает целевую комбинацию `курс+группа+неделя`, затем вставляет пары).
+
+---
+
 ### GET `/adminapi/pairs`
 
 Получить существующие пары для редактирования (в табличном виде).
