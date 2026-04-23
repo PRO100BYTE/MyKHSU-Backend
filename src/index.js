@@ -6,11 +6,37 @@ import { config } from './config.js';
 import { noStore } from './middleware/noStore.js';
 import userRouter from './routes/user.js';
 import adminRouter from './routes/admin.js';
+import { logError, logInfo, getLogFilePath } from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 const app = express();
+
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  const requestId = `${startedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+  logInfo('request:start', {
+    requestId,
+    method: req.method,
+    path: req.originalUrl,
+    ip: req.ip,
+    userAgent: req.get('user-agent') ?? '',
+  });
+
+  res.on('finish', () => {
+    logInfo('request:finish', {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  });
+
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // CORS поддержка для кастомных эндпоинтов
@@ -98,7 +124,25 @@ if (fs.existsSync(webBuildDir)) {
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error('[error]', err);
+  logError('request:error', {
+    message: err?.message ?? 'Unknown error',
+    stack: err?.stack ?? null,
+  });
   res.status(500).json({ error: 'Internal Server Error' });
+});
+
+process.on('unhandledRejection', reason => {
+  logError('process:unhandledRejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : null,
+  });
+});
+
+process.on('uncaughtException', error => {
+  logError('process:uncaughtException', {
+    message: error?.message ?? 'Unknown uncaught exception',
+    stack: error?.stack ?? null,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -106,6 +150,12 @@ app.use((err, _req, res, _next) => {
 // ---------------------------------------------------------------------------
 app.listen(config.port, config.host, () => {
   console.log(`[server] Listening on http://${config.host}:${config.port}`);
+  console.log(`[log]    File: ${getLogFilePath()}`);
+  logInfo('server:start', {
+    host: config.host,
+    port: config.port,
+    logFile: getLogFilePath(),
+  });
   if (fs.existsSync(path.join(webBuildDir, 'admin-panel', 'index.html'))) {
     console.log(`[admin]  Panel: http://${config.host}:${config.port}/admin-panel/`);
   } else {

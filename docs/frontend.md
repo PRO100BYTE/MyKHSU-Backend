@@ -263,6 +263,8 @@ POST /adminapi/*     → Административный API
 GET  /static/*       → legacy статика (из STATIC_PATH)
 ```
 
+Для диагностики ошибок API сервер пишет подробные записи по каждому запросу и runtime-ошибке в отдельный файл `logs/server.log`.
+
 ---
 
 ## Разработка Admin Panel

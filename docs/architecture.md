@@ -38,6 +38,7 @@
 | `middleware/noStore.js` | Заголовки Cache-Control: no-store |
 | `utils/dates.js` | Вычисление дат по номеру недели |
 | `utils/env.js` | Парсер .env без сторонних зависимостей |
+| `utils/logger.js` | Файловое логирование запросов и ошибок в `logs/server.log` |
 
 ### 2. Admin Panel (admin-panel/src/)
 
@@ -127,7 +128,7 @@ Middleware поддерживает два заголовка:
 | Пароли | argon2.IDKey (hex) | argon2 (npm) |
 | SQLite | mattn/go-sqlite3 | better-sqlite3 |
 | Конфиг | собственный парсер | .env |
-| Логирование | xlogger (GitFlic) | console |
+| Логирование | xlogger (GitFlic) | `logs/server.log` + console |
 | Фронтенд | WebAssembly (wasm_frontend) | React (MyKHSU-web) |
 | Admin UI | Go templates (experimental) | React |
 
