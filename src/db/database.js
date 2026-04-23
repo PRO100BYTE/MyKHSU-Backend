@@ -108,6 +108,7 @@ function initUsersSchema(db) {
       is_active  INTEGER NOT NULL DEFAULT 1,
       role       TEXT NOT NULL DEFAULT 'admin',
       first_name TEXT,
+      middle_name TEXT,
       last_name  TEXT,
       position   TEXT,
       email      TEXT,
@@ -198,6 +199,9 @@ function initUsersSchema(db) {
   }
   if (!columns.includes('first_name')) {
     db.exec('ALTER TABLE users ADD COLUMN first_name TEXT');
+  }
+  if (!columns.includes('middle_name')) {
+    db.exec('ALTER TABLE users ADD COLUMN middle_name TEXT');
   }
   if (!columns.includes('last_name')) {
     db.exec('ALTER TABLE users ADD COLUMN last_name TEXT');

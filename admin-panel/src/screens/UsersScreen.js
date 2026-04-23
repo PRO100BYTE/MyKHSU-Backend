@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const EMPTY_FORM = {
   username: '',
@@ -8,6 +9,7 @@ const EMPTY_FORM = {
   is_active: true,
   role: 'admin',
   first_name: '',
+  middle_name: '',
   last_name: '',
   position: '',
   email: '',
@@ -46,11 +48,10 @@ const ROLE_PERMISSIONS = {
 
 export default function UsersScreen() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [okMessage, setOkMessage] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -61,12 +62,16 @@ export default function UsersScreen() {
     const res = await api.getUsers();
     if (res?.ok) {
       setItems(res.data ?? []);
-      setError('');
     } else {
-      setError(res?.data?.error ?? 'Не удалось загрузить пользователей');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось загрузить пользователей.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-USR-001',
+      });
     }
     setLoading(false);
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     loadUsers();
@@ -81,7 +86,6 @@ export default function UsersScreen() {
     setEditTarget(null);
     setForm(EMPTY_FORM);
     setIsModalOpen(true);
-    setError('');
   }
 
   function openEdit(target) {
@@ -92,12 +96,12 @@ export default function UsersScreen() {
       is_active: Boolean(target.is_active),
       role: target.role ?? 'admin',
       first_name: target.first_name ?? '',
+      middle_name: target.middle_name ?? '',
       last_name: target.last_name ?? '',
       position: target.position ?? '',
       email: target.email ?? '',
     });
     setIsModalOpen(true);
-    setError('');
   }
 
   function closeModal() {
@@ -109,13 +113,13 @@ export default function UsersScreen() {
   async function onSubmit(event) {
     event.preventDefault();
     setSaving(true);
-    setError('');
 
     const payload = {
       username: form.username.trim(),
       is_active: Boolean(form.is_active),
       role: form.role,
       first_name: form.first_name.trim(),
+      middle_name: form.middle_name.trim(),
       last_name: form.last_name.trim(),
       position: form.position.trim(),
       email: form.email.trim(),
@@ -132,29 +136,38 @@ export default function UsersScreen() {
     setSaving(false);
 
     if (!res?.ok) {
-      setError(res?.data?.error ?? 'Не удалось сохранить пользователя');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось сохранить пользователя.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-USR-002',
+      });
       return;
     }
 
-    setOkMessage(editTarget ? 'Пользователь обновлен' : 'Пользователь создан');
+    showToast({ variant: 'success', title: editTarget ? 'Пользователь обновлен.' : 'Пользователь создан.' });
     closeModal();
     await loadUsers();
   }
 
   async function toggleStatus(target) {
     setSaving(true);
-    setError('');
     const res = target.is_active
       ? await api.disableUser(target.id)
       : await api.enableUser(target.id);
     setSaving(false);
 
     if (!res?.ok) {
-      setError(res?.data?.error ?? 'Не удалось обновить статус');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось обновить статус пользователя.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-USR-003',
+      });
       return;
     }
 
-    setOkMessage(target.is_active ? 'Пользователь отключен' : 'Пользователь включен');
+    showToast({ variant: 'success', title: target.is_active ? 'Пользователь отключен.' : 'Пользователь включен.' });
     await loadUsers();
   }
 
@@ -162,16 +175,20 @@ export default function UsersScreen() {
     if (!window.confirm(`Удалить пользователя "${target.username}"?`)) return;
 
     setSaving(true);
-    setError('');
     const res = await api.deleteUser(target.id);
     setSaving(false);
 
     if (!res?.ok) {
-      setError(res?.data?.error ?? 'Не удалось удалить пользователя');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось удалить пользователя.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-USR-004',
+      });
       return;
     }
 
-    setOkMessage('Пользователь удален');
+    showToast({ variant: 'success', title: 'Пользователь удален.' });
     await loadUsers();
   }
 
@@ -186,9 +203,6 @@ export default function UsersScreen() {
           <div className="screen-hero__sub">Управление доступом к административной панели</div>
         </div>
       </div>
-
-      {okMessage && <div className="alert alert-success"><ion-icon name="checkmark-circle-outline" />{okMessage}</div>}
-      {error && <div className="alert alert-error"><ion-icon name="warning-outline" />{error}</div>}
 
       <div className="card">
         <div className="card__header">
@@ -232,7 +246,7 @@ export default function UsersScreen() {
                     return (
                       <tr key={item.id}>
                         <td className="table-cell-strong">{item.username}</td>
-                        <td>{[item.first_name, item.last_name].filter(Boolean).join(' ') || '—'}</td>
+                        <td>{[item.last_name, item.first_name, item.middle_name].filter(Boolean).join(' ') || '—'}</td>
                         <td>{item.position || '—'}</td>
                         <td>{item.email || '—'}</td>
                         <td>
@@ -323,6 +337,15 @@ export default function UsersScreen() {
                   className="form-input"
                   value={form.first_name}
                   onChange={e => setForm(prev => ({ ...prev, first_name: e.target.value }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Отчество</label>
+                <input
+                  className="form-input"
+                  value={form.middle_name}
+                  onChange={e => setForm(prev => ({ ...prev, middle_name: e.target.value }))}
                 />
               </div>
 

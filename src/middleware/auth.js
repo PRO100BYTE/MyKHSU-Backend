@@ -36,7 +36,7 @@ export function requireAuth(req, res, next) {
     }
 
     const dbUser = usersDb
-      .prepare('SELECT id, username, is_active, role, first_name, last_name, position, email FROM users WHERE id = ?')
+      .prepare('SELECT id, username, is_active, role, first_name, middle_name, last_name, position, email FROM users WHERE id = ?')
       .get(payload.uid);
     if (!dbUser) {
       return sendAuthError(res, 401, 'ADM-AUTH-007', 'Unauthorized: user not found');
@@ -50,6 +50,7 @@ export function requireAuth(req, res, next) {
       username: dbUser.username,
       role: dbUser.role ?? 'admin',
       first_name: dbUser.first_name ?? null,
+      middle_name: dbUser.middle_name ?? null,
       last_name: dbUser.last_name ?? null,
       position: dbUser.position ?? null,
       email: dbUser.email ?? null,

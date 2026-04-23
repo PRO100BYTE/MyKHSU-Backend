@@ -41,6 +41,14 @@ export default function DashboardScreen() {
   const courseCount = stats?.courses?.length ?? 0;
   const currentWeek = stats?.weeks?.current ?? '—';
   const lastUpdate = stats?.lastUpdate?.last_update ?? 'Никогда';
+  const quickActions = [
+    { icon: 'cloud-upload-outline', label: 'Загрузить расписание', href: '/admin-panel/schedule/upload', color: 'var(--accent)', requiredPerms: ['schedule:write'] },
+    { icon: 'pencil-outline', label: 'Управление новостями', href: '/admin-panel/news', color: '#3B82F6', requiredPerms: ['news:write'] },
+    { icon: 'alarm-outline', label: 'Расписание звонков', href: '/admin-panel/times', color: '#8B5CF6', requiredPerms: ['times:write'] },
+    { icon: 'people-outline', label: 'Пользователи админки', href: '/admin-panel/users', color: '#0EA5E9', requiredPerms: ['users:write'] },
+    { icon: 'mail-open-outline', label: 'Обращения Единого окна', href: '/admin-panel/unified-window', color: '#16A34A', requiredPerms: ['unified_window:read', 'unified_window:write'] },
+    { icon: 'trash-outline', label: 'Очистить расписание', danger: true, href: '/admin-panel/schedule/delete', requiredPerms: ['schedule:write'] },
+  ].filter(action => action.requiredPerms.some(perm => hasPermission(perm)));
 
   return (
     <div className="screen-stack screen-stack--lg">
@@ -71,11 +79,20 @@ export default function DashboardScreen() {
           </div>
         </div>
         <div className="card__body actions-row">
-          <QuickAction icon="cloud-upload-outline" label="Загрузить расписание" href="/admin-panel/schedule/upload" color="var(--accent)" />
-          <QuickAction icon="pencil-outline" label="Управление новостями" href="/admin-panel/news" color="#3B82F6" />
-          <QuickAction icon="alarm-outline" label="Расписание звонков" href="/admin-panel/times" color="#8B5CF6" />
-          <QuickAction icon="people-outline" label="Пользователи админки" href="/admin-panel/users" color="#0EA5E9" />
-          <QuickAction icon="trash-outline" label="Очистить расписание" danger href="/admin-panel/schedule/delete" />
+          {quickActions.length ? quickActions.map(action => (
+            <QuickAction
+              key={action.href}
+              icon={action.icon}
+              label={action.label}
+              href={action.href}
+              color={action.color}
+              danger={action.danger}
+            />
+          )) : (
+            <div className="empty" style={{ width: '100%' }}>
+              Нет доступных быстрых действий для вашей роли.
+            </div>
+          )}
         </div>
       </div>
 

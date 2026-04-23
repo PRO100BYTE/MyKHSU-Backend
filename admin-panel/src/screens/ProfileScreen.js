@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const [form, setForm] = useState({
     username: '',
     first_name: '',
+    middle_name: '',
     last_name: '',
     position: '',
     email: '',
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
         ...prev,
         username: data.username || '',
         first_name: data.first_name || '',
+        middle_name: data.middle_name || '',
         last_name: data.last_name || '',
         position: data.position || '',
         email: data.email || '',
@@ -59,6 +61,7 @@ export default function ProfileScreen() {
     const payload = {
       username: form.username,
       first_name: form.first_name,
+      middle_name: form.middle_name,
       last_name: form.last_name,
       position: form.position,
       email: form.email,
@@ -86,9 +89,7 @@ export default function ProfileScreen() {
     return (user?.username?.[0] ?? 'U').toUpperCase();
   })();
 
-  const displayName = form.first_name && form.last_name
-    ? `${form.first_name} ${form.last_name}`
-    : form.first_name || user?.username || '';
+  const displayName = [form.last_name, form.first_name, form.middle_name].filter(Boolean).join(' ') || user?.username || '';
 
   if (loadingProfile) {
     return (
@@ -136,6 +137,12 @@ export default function ProfileScreen() {
                 <input className="input" value={form.last_name}
                   onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))}
                   placeholder="Введите фамилию" />
+              </label>
+              <label className="field">
+                <span className="field__label">Отчество</span>
+                <input className="input" value={form.middle_name}
+                  onChange={e => setForm(p => ({ ...p, middle_name: e.target.value }))}
+                  placeholder="Введите отчество (необязательно)" />
               </label>
               <label className="field">
                 <span className="field__label">Должность</span>

@@ -10,11 +10,31 @@ const STATUSES = [
   { value: 'closed', label: 'Закрытые' },
 ]
 
+const STATUS_LABELS = {
+  open: 'Открыто',
+  in_progress: 'В работе',
+  resolved: 'Решено',
+  closed: 'Закрыто',
+}
+
+function formatDate(value) {
+  if (!value) return 'Неизвестно'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('ru-RU')
+}
+
+function getMessageAuthor(message) {
+  if (message.author_role === 'user') return message.author_name || 'Пользователь'
+  return message.author_name || 'Агент'
+}
+
 export default function UnifiedWindowScreen() {
   const { showToast } = useToast()
   const [statusFilter, setStatusFilter] = useState('')
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
+  const [selectedId, setSelectedId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -38,23 +58,20 @@ export default function UnifiedWindowScreen() {
       showRequestError('Не удалось загрузить обращения Единого окна.', resp)
       return
     }
-    setTickets(Array.isArray(resp.data) ? resp.data : [])
+    const list = Array.isArray(resp.data) ? resp.data : []
+    setTickets(list)
+    if (!list.some(ticket => ticket.id === selectedId)) {
+      setSelectedId(null)
+      setSelected(null)
+    }
   }
 
   useEffect(() => {
     fetchTickets()
   }, [statusFilter])
 
-  useEffect(() => {
-    if (!selected) return
-    setForm({
-      status: selected.status || 'open',
-      responseText: '',
-      comment: '',
-    })
-  }, [selected])
-
   const openTicket = async (ticketId) => {
+    setSelectedId(ticketId)
     setSelectedLoading(true)
     const resp = await api.getUwTicket(ticketId)
     setSelectedLoading(false)
@@ -65,6 +82,11 @@ export default function UnifiedWindowScreen() {
     }
 
     setSelected(resp.data)
+    setForm({
+      status: resp.data?.status || 'open',
+      responseText: '',
+      comment: '',
+    })
   }
 
   const counts = useMemo(() => {
@@ -117,12 +139,13 @@ export default function UnifiedWindowScreen() {
     }
 
     setSelected(detailResp.data)
+    setSelectedId(detailResp.data?.id ?? selected.id)
     setForm(current => ({ ...current, responseText: '', comment: '' }))
     fetchTickets()
     showToast({ variant: 'success', title: 'Обращение успешно обновлено.' })
   }
 
-  const latestMessage = selected?.messages?.[0]?.text || 'Сообщение отсутствует'
+  const selectedTicketPreview = tickets.find(ticket => ticket.id === selectedId)
 
   return (
     <section className="panel">
@@ -143,6 +166,7 @@ export default function UnifiedWindowScreen() {
           <span className="chip">Открытые: {counts.open || 0}</span>
           <span className="chip">В работе: {counts.in_progress || 0}</span>
           <span className="chip">Решенные: {counts.resolved || 0}</span>
+          <span className="chip">Закрытые: {counts.closed || 0}</span>
         </div>
       </div>
 
@@ -151,106 +175,97 @@ export default function UnifiedWindowScreen() {
       {!loading && !tickets.length ? <div className="empty">Заявок нет</div> : null}
 
       {!loading && tickets.length ? (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Роль</th>
-                <th>Тема</th>
-                <th>Контакты</th>
-                <th>Статус</th>
-                <th>Создана</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map(t => (
-                <tr key={t.id}>
-                  <td>{t.id}</td>
-                  <td>{t.requester_role}</td>
-                  <td>{t.subject}</td>
-                  <td>{t.requester_name || '-'} / {t.requester_email || '-'}</td>
-                  <td>{t.status}</td>
-                  <td>{t.created_at}</td>
-                  <td>
-                    <button className="btn" onClick={() => openTicket(t.id)}>Открыть</button>
-                  </td>
-                </tr>
+        <div className="uw-admin-layout">
+          <aside className="uw-admin-tickets">
+            <div className="uw-admin-tickets__header">Список обращений</div>
+            <div className="uw-admin-tickets__list">
+              {tickets.map(ticket => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  className={`uw-admin-ticket-card ${ticket.id === selectedId ? 'is-active' : ''}`}
+                  onClick={() => openTicket(ticket.id)}
+                >
+                  <div className="uw-admin-ticket-card__row">
+                    <strong>#{ticket.id}</strong>
+                    <span className="badge badge-gray">{STATUS_LABELS[ticket.status] || ticket.status}</span>
+                  </div>
+                  <div className="uw-admin-ticket-card__subject">{ticket.subject || 'Без темы'}</div>
+                  <div className="uw-admin-ticket-card__meta">{ticket.contact_name || 'Без имени'} • {ticket.contact_email || 'без email'}</div>
+                  <div className="uw-admin-ticket-card__meta">{formatDate(ticket.updated_at || ticket.created_at)}</div>
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
-      {selected ? (
-        <div className="modal-overlay" onClick={() => setSelected(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal__header">
-              <h3>Заявка #{selected.id}</h3>
             </div>
-            {selectedLoading ? <div className="modal__body">Загрузка данных обращения...</div> : null}
-            <div className="form-grid" style={{ gap: 10 }}>
-              <div className="field">
-                <span className="field__label">Тема</span>
-                <div className="input input--readonly">{selected.subject}</div>
-              </div>
-              <div className="field">
-                <span className="field__label">Контактные данные</span>
-                <div className="input input--readonly">
-                  {selected.contact_name || 'Без имени'} / {selected.contact_email || 'Email не указан'}
-                </div>
-              </div>
-              <div className="field">
-                <span className="field__label">Сообщение</span>
-                <div className="input input--readonly" style={{ minHeight: 100, whiteSpace: 'pre-wrap' }}>{latestMessage}</div>
-              </div>
-              <label className="field">
-                <span className="field__label">Статус</span>
-                <select className="select" value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value }))}>
-                  {STATUSES.slice(1).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field__label">Комментарий к смене статуса</span>
-                <textarea className="input" rows={3} value={form.comment} onChange={e => setForm(v => ({ ...v, comment: e.target.value }))} />
-              </label>
-              <label className="field">
-                <span className="field__label">Ответ заявителю</span>
-                <textarea className="input" rows={4} value={form.responseText} onChange={e => setForm(v => ({ ...v, responseText: e.target.value }))} />
-              </label>
-              {Array.isArray(selected.messages) && selected.messages.length > 0 ? (
-                <div className="field">
-                  <span className="field__label">Переписка</span>
-                  <div className="table-wrap" style={{ maxHeight: 220 }}>
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Автор</th>
-                          <th>Сообщение</th>
-                          <th>Дата</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selected.messages.map(message => (
-                          <tr key={message.id}>
-                            <td>{message.author_name || message.author_role}</td>
-                            <td style={{ whiteSpace: 'pre-wrap' }}>{message.text || '—'}</td>
-                            <td>{message.created_at}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          </aside>
+
+          <div className="uw-admin-chat">
+            {!selectedId ? (
+              <div className="empty">Выберите обращение из списка слева</div>
+            ) : selectedLoading && !selected ? (
+              <div className="empty">Загрузка диалога...</div>
+            ) : selected ? (
+              <>
+                <div className="uw-admin-chat__header">
+                  <div>
+                    <h3>Обращение #{selected.id}</h3>
+                    <p className="muted">{selected.subject || selectedTicketPreview?.subject || 'Без темы'}</p>
+                    <p className="muted">{selected.contact_name || 'Без имени'} • {selected.contact_email || 'без email'} • {selected.category || 'other'}</p>
+                  </div>
+                  <div className="uw-admin-chat__controls">
+                    <label className="field">
+                      <span className="field__label">Статус</span>
+                      <select className="select" value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value }))}>
+                        {STATUSES.slice(1).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span className="field__label">Комментарий к статусу</span>
+                      <input
+                        className="input"
+                        value={form.comment}
+                        onChange={e => setForm(v => ({ ...v, comment: e.target.value }))}
+                        placeholder="Причина изменения статуса"
+                      />
+                    </label>
+                    <button className="btn btn-primary" onClick={saveTicket} disabled={saving}>
+                      {saving ? 'Сохранение...' : 'Сохранить изменения'}
+                    </button>
                   </div>
                 </div>
-              ) : null}
-            </div>
-            <div className="modal__footer">
-              <button className="btn" onClick={() => setSelected(null)}>Закрыть</button>
-              <button className="btn btn-primary" onClick={saveTicket} disabled={saving}>
-                {saving ? 'Сохранение...' : 'Сохранить'}
-              </button>
-            </div>
+
+                <div className="uw-admin-chat__messages">
+                  {Array.isArray(selected.messages) && selected.messages.length ? selected.messages.map(message => (
+                    <div
+                      key={message.id}
+                      className={`uw-admin-message ${message.author_role === 'agent' ? 'is-agent' : 'is-user'}`}
+                    >
+                      <div className="uw-admin-message__meta">
+                        <strong>{getMessageAuthor(message)}</strong>
+                        <span>{formatDate(message.created_at)}</span>
+                      </div>
+                      <div className="uw-admin-message__body">{message.text || '—'}</div>
+                    </div>
+                  )) : (
+                    <div className="empty">Переписка пока отсутствует</div>
+                  )}
+                </div>
+
+                <div className="uw-admin-chat__composer">
+                  <label className="field">
+                    <span className="field__label">Ответ заявителю</span>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={form.responseText}
+                      onChange={e => setForm(v => ({ ...v, responseText: e.target.value }))}
+                      placeholder="Введите ответ пользователю"
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <div className="empty">Не удалось открыть обращение</div>
+            )}
           </div>
         </div>
       ) : null}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
+import { useToast } from '../context/ToastContext';
 
 const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
@@ -54,6 +55,7 @@ export default function ScheduleScreen() {
 }
 
 function ManualTab() {
+  const { showToast } = useToast();
   const [course, setCourse] = useState('1');
   const [group, setGroup] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
@@ -67,7 +69,6 @@ function ManualTab() {
   const [courses, setCourses] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -132,16 +133,24 @@ function ManualTab() {
   const createCatalogCourse = async () => {
     const num = Number.parseInt(catalogCourse, 10);
     if (Number.isNaN(num)) {
-      alert('Введите номер курса');
+      showToast({ variant: 'warning', title: 'Введите номер курса.', code: 'UI-SCH-001' });
       return;
     }
     const resp = await api.createCatalogCourse(num);
     if (!resp?.ok) {
-      alert(resp?.data?.error || 'Не удалось добавить курс');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось добавить курс.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-002',
+      });
       return;
     }
     setCatalogCourse('');
-    setNotice(resp.data?.inserted ? 'Курс добавлен в каталог' : 'Курс уже существует в каталоге');
+    showToast({
+      variant: 'success',
+      title: resp.data?.inserted ? 'Курс добавлен в каталог.' : 'Курс уже существует в каталоге.',
+    });
 
     const coursesResp = await api.getCourses();
     const fetchedCourses = Array.isArray(coursesResp) ? coursesResp : [];
@@ -155,16 +164,24 @@ function ManualTab() {
 
   const createCatalogGroup = async () => {
     if (!catalogGroupName.trim()) {
-      alert('Введите название группы');
+      showToast({ variant: 'warning', title: 'Введите название группы.', code: 'UI-SCH-003' });
       return;
     }
     const resp = await api.createCatalogGroup({ course: Number.parseInt(catalogGroupCourse, 10), group_name: catalogGroupName.trim() });
     if (!resp?.ok) {
-      alert(resp?.data?.error || 'Не удалось добавить группу');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось добавить группу.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-004',
+      });
       return;
     }
     setCatalogGroupName('');
-    setNotice(resp.data?.inserted ? 'Группа добавлена в каталог' : 'Группа уже существует в каталоге');
+    showToast({
+      variant: 'success',
+      title: resp.data?.inserted ? 'Группа добавлена в каталог.' : 'Группа уже существует в каталоге.',
+    });
 
     const selectedCourse = parseInt(course, 10);
     if (!Number.isNaN(selectedCourse)) {
@@ -176,7 +193,7 @@ function ManualTab() {
 
   const submitManual = async () => {
     if (!group.trim()) {
-      alert('Укажите группу');
+      showToast({ variant: 'warning', title: 'Укажите группу.', code: 'UI-SCH-005' });
       return;
     }
 
@@ -185,7 +202,7 @@ function ManualTab() {
       .filter((item) => item.time || item.subject || item.teacher || item.auditory || item.type);
 
     if (!cleaned.length) {
-      alert('Добавьте хотя бы одну строку пары');
+      showToast({ variant: 'warning', title: 'Добавьте хотя бы одну строку пары.', code: 'UI-SCH-006' });
       return;
     }
 
@@ -195,12 +212,12 @@ function ManualTab() {
     const parsedWeek = parseInt(weekNumber, 10);
     if (Number.isNaN(parsedCourse)) {
       setLoading(false);
-      alert('Курс должен быть числом');
+      showToast({ variant: 'warning', title: 'Курс должен быть числом.', code: 'UI-SCH-007' });
       return;
     }
     if (Number.isNaN(parsedWeek)) {
       setLoading(false);
-      alert('Номер недели должен быть числом');
+      showToast({ variant: 'warning', title: 'Номер недели должен быть числом.', code: 'UI-SCH-008' });
       return;
     }
 
@@ -238,10 +255,15 @@ function ManualTab() {
 
     setLoading(false);
     if (!resp?.ok) {
-      alert(resp?.data?.error || 'Не удалось сохранить расписание');
+      showToast({
+        variant: 'error',
+        title: 'Не удалось сохранить расписание.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-009',
+      });
       return;
     }
-    setNotice('Расписание сохранено');
+    showToast({ variant: 'success', title: 'Расписание сохранено.' });
   };
 
   return (
@@ -253,13 +275,6 @@ function ManualTab() {
         </div>
       </div>
       <div className="card__body" style={{ display: 'grid', gap: 14 }}>
-        {notice ? (
-          <div className="alert alert-success">
-            <ion-icon name="checkmark-circle-outline" />
-            {notice}
-          </div>
-        ) : null}
-
         <div className="table-wrap" style={{ padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>Добавить курс</div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -353,6 +368,7 @@ function ManualTab() {
 }
 
 function EditTab() {
+  const { showToast } = useToast();
   const [course, setCourse] = useState('1');
   const [group, setGroup] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
@@ -361,7 +377,6 @@ function EditTab() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingData, setEditingData] = useState(null);
 
@@ -408,7 +423,7 @@ function EditTab() {
 
   const loadPairs = async () => {
     if (!group) {
-      setNotice('Выберите группу');
+      showToast({ variant: 'warning', title: 'Выберите группу.', code: 'UI-SCH-010' });
       return;
     }
     setLoading(true);
@@ -416,9 +431,8 @@ function EditTab() {
     setLoading(false);
     if (Array.isArray(resp)) {
       setPairs(resp);
-      setNotice('');
     } else {
-      setNotice('Не удалось загрузить пары');
+      showToast({ variant: 'error', title: 'Не удалось загрузить пары.', code: 'UI-SCH-011' });
     }
   };
 
@@ -431,9 +445,14 @@ function EditTab() {
       setPairs(prev => prev.map(p => p.id === pairId ? { ...p, ...editingData } : p));
       setEditingId(null);
       setEditingData(null);
-      setNotice('Пара обновлена');
+      showToast({ variant: 'success', title: 'Пара обновлена.' });
     } else {
-      setNotice(resp?.data?.error || 'Ошибка сохранения');
+      showToast({
+        variant: 'error',
+        title: 'Ошибка сохранения пары.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-012',
+      });
     }
   };
 
@@ -444,9 +463,14 @@ function EditTab() {
     setSaving(false);
     if (resp?.ok) {
       setPairs(prev => prev.filter(p => p.id !== pairId));
-      setNotice('Пара удалена');
+      showToast({ variant: 'success', title: 'Пара удалена.' });
     } else {
-      setNotice(resp?.data?.error || 'Ошибка удаления');
+      showToast({
+        variant: 'error',
+        title: 'Ошибка удаления пары.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-013',
+      });
     }
   };
 
@@ -459,13 +483,6 @@ function EditTab() {
         </div>
       </div>
       <div className="card__body" style={{ display: 'grid', gap: 14 }}>
-        {notice ? (
-          <div className={`alert ${notice.includes('ошибка') ? 'alert-error' : 'alert-success'}`}>
-            <ion-icon name={notice.includes('ошибка') ? 'alert-circle-outline' : 'checkmark-circle-outline'} />
-            {notice}
-          </div>
-        ) : null}
-
         <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
             {!courses.length ? <option value="">Нет курсов</option> : null}
@@ -477,7 +494,7 @@ function EditTab() {
           </select>
           <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
           <button className="btn btn-primary" onClick={loadPairs} disabled={loading || !group}>
-            {loading ? 'Загрузка...' : '载загрузить'}
+            {loading ? 'Загрузка...' : 'Загрузить'}
           </button>
         </div>
 
@@ -602,10 +619,10 @@ function EditTab() {
 }
 
 function UploadTab() {
+  const { showToast } = useToast();
   const [file, setFile] = useState(null);
   const [replace, setReplace] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef();
 
@@ -619,14 +636,18 @@ function UploadTab() {
   async function handleUpload() {
     if (!file) return;
     setLoading(true);
-    setResult(null);
     const res = await api.uploadSchedule(file, replace);
     setLoading(false);
     if (res?.ok) {
-      setResult({ ok: true, msg: `Успешно! Добавлено строк: ${res.data.inserted ?? '?'}` });
+      showToast({ variant: 'success', title: `Успешно: добавлено строк ${res.data.inserted ?? '?'}.` });
       setFile(null);
     } else {
-      setResult({ ok: false, msg: res?.data?.error ?? 'Ошибка загрузки' });
+      showToast({
+        variant: 'error',
+        title: 'Ошибка загрузки расписания.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-SCH-014',
+      });
     }
   }
 
@@ -639,13 +660,6 @@ function UploadTab() {
         </div>
       </div>
       <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {result && (
-          <div className={`alert ${result.ok ? 'alert-success' : 'alert-error'}`}>
-            <ion-icon name={result.ok ? 'checkmark-circle-outline' : 'alert-circle-outline'} />
-            {result.msg}
-          </div>
-        )}
-
         {/* Upload zone */}
         <div
           className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
@@ -697,15 +711,24 @@ function UploadTab() {
 }
 
 function DeleteTab() {
+  const { showToast } = useToast();
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
 
   async function handleDelete() {
     setLoading(true);
-    await api.deletePairsTable();
+    const res = await api.deletePairsTable();
     setLoading(false);
-    setDone(true);
+    if (!res?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось очистить расписание.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-SCH-015',
+      });
+      return;
+    }
+    showToast({ variant: 'success', title: 'Расписание успешно очищено.' });
     setConfirm(false);
   }
 
@@ -720,12 +743,6 @@ function DeleteTab() {
         </div>
       </div>
       <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {done && (
-          <div className="alert alert-success">
-            <ion-icon name="checkmark-circle-outline" />
-            Расписание успешно очищено.
-          </div>
-        )}
         <div className="alert alert-warning">
           <ion-icon name="warning-outline" />
           Это действие нельзя отменить. Все пары будут удалены безвозвратно.

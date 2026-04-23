@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import { useToast } from '../context/ToastContext';
 
 export default function TimesScreen() {
+  const { showToast } = useToast();
   const [times, setTimes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [alert, setAlert] = useState(null);
   const [saving, setSaving] = useState(false);
   // pending changes: { [id_or_new_key]: { ...fields, method: create|update|delete } }
   const [changes, setChanges] = useState({});
@@ -17,11 +18,6 @@ export default function TimesScreen() {
   }
 
   useEffect(() => { loadTimes(); }, []);
-
-  function showAlert(msg, ok = true) {
-    setAlert({ msg, ok });
-    setTimeout(() => setAlert(null), 3500);
-  }
 
   function handleChange(key, field, value) {
     setChanges(prev => {
@@ -50,11 +46,16 @@ export default function TimesScreen() {
     const res = await api.updateTimes(items);
     setSaving(false);
     if (res?.ok) {
-      showAlert('Сохранено!');
+      showToast({ variant: 'success', title: 'Расписание звонков сохранено.' });
       setChanges({});
       loadTimes();
     } else {
-      showAlert(res?.data?.error ?? 'Ошибка', false);
+      showToast({
+        variant: 'error',
+        title: 'Не удалось сохранить расписание звонков.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-TMS-001',
+      });
     }
   }
 
@@ -83,13 +84,6 @@ export default function TimesScreen() {
           <div className="screen-hero__sub">Гибкое редактирование времени пар</div>
         </div>
       </div>
-
-      {alert && (
-        <div className={`alert ${alert.ok ? 'alert-success' : 'alert-error'}`}>
-          <ion-icon name={alert.ok ? 'checkmark-circle-outline' : 'alert-circle-outline'} />
-          {alert.msg}
-        </div>
-      )}
 
       <div className="card">
         <div className="card__header">

@@ -396,6 +396,16 @@ function emailHash(email) {
   return createHash('sha256').update(email).digest('hex')
 }
 
+function mapTicketStatusLabel(status) {
+  const labels = {
+    open: 'Открыто',
+    in_progress: 'В работе',
+    resolved: 'Решено',
+    closed: 'Закрыто',
+  }
+  return labels[status] ?? status
+}
+
 function decryptTicketField(row, field) {
   const iv = row[`encrypted_${field}_iv`]
   const tag = row[`encrypted_${field}_tag`]
@@ -603,4 +613,52 @@ router.post('/unified-window/tickets/:token/reply', (req, res) => {
   }
 
   res.json({ ok: true, id: result.lastInsertRowid })
+})
+
+// POST /api/unified-window/tickets/:token/close — закрыть обращение пользователем с комментарием
+router.post('/unified-window/tickets/:token/close', (req, res) => {
+  const { token } = req.params
+  if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
+
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+  if (ticket.status === 'closed') return res.status(400).json({ error: 'Ticket is already closed' })
+
+  const { comment, contact_name } = req.body ?? {}
+  const safeComment = normalizeNullableText(comment, 500)
+  if (!safeComment) {
+    return res.status(400).json({ error: 'comment is required' })
+  }
+
+  const now = uwNowSql()
+  const safeContactName = normalizeNullableText(contact_name, 160)
+  const fallbackContactName = decryptTicketField(ticket, 'contact_name')
+  const actorName = safeContactName ?? fallbackContactName ?? 'Пользователь'
+
+  usersDb.prepare('UPDATE unified_window_tickets SET status = ?, updated_at = ? WHERE id = ?').run('closed', now, ticket.id)
+  usersDb.prepare(
+    `INSERT INTO unified_window_status_history (ticket_id, from_status, to_status, changed_by, comment, created_at)
+     VALUES (?, ?, 'closed', ?, ?, ?)`
+  ).run(ticket.id, ticket.status ?? null, actorName, safeComment, now)
+
+  const encrypted = encryptText(`Пользователь закрыл обращение. Причина: ${safeComment}`)
+  usersDb.prepare(
+    `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
+     VALUES (?, 'user', ?, ?, ?, ?, ?)`
+  ).run(ticket.id, actorName, encrypted.iv, encrypted.tag, encrypted.data, now)
+
+  const ticketEmail = decryptTicketField(ticket, 'contact_email')
+  const ticketSubject = decryptTicketField(ticket, 'subject')
+
+  if (ticketEmail) {
+    sendUnifiedWindowEmail({
+      to: ticketEmail,
+      subject: `Обращение #${ticket.id} закрыто`,
+      text: `Обращение "${ticketSubject ?? 'Без темы'}" закрыто.
+Причина: ${safeComment}
+Статус: ${mapTicketStatusLabel('closed')}`,
+    }).catch(() => {})
+  }
+
+  res.json({ ok: true })
 })

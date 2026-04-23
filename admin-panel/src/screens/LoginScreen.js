@@ -10,6 +10,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
@@ -42,23 +43,24 @@ export default function LoginScreen() {
 
   return (
     <div className="login-screen">
-      <div className="login-card">
+      <div className="login-card login-card--animated">
         <div className="login-logo">
-          <div className="login-logo__badge" aria-hidden="true">
-            <ion-icon name="shield-checkmark-outline" />
+          <div className="login-logo__icon-wrap">
+            <BrandMark className="login-logo__icon" />
           </div>
-          <BrandMark className="login-logo__icon" />
           <div className="login-logo__title">{ADMIN_UI.brandTitle}</div>
           <div className="login-logo__sub">{ADMIN_UI.loginSubTitle}</div>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Логин</label>
+          <div className="form-group form-group--login">
+            <label className="form-label form-label--row">
+              <ion-icon name="person-outline" aria-hidden="true" />
+              <span>Логин</span>
+            </label>
             <div className="input-with-icon">
-              <ion-icon className="input-icon" name="person-outline" aria-hidden="true" />
               <input
-                className="form-input input-with-icon__control"
+                className="form-input input-with-icon__control input-with-icon__control--clean"
                 type="text"
                 autoComplete="username"
                 placeholder="admin"
@@ -69,12 +71,14 @@ export default function LoginScreen() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Пароль</label>
+          <div className="form-group form-group--password">
+            <label className="form-label form-label--row">
+              <ion-icon name="lock-closed-outline" aria-hidden="true" />
+              <span>Пароль</span>
+            </label>
             <div className="input-with-icon">
-              <ion-icon className="input-icon" name="lock-closed-outline" aria-hidden="true" />
               <input
-                className="form-input input-with-icon__control input-with-icon__control--password"
+                className="form-input input-with-icon__control input-with-icon__control--clean input-with-icon__control--password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 placeholder="••••••••"
@@ -86,7 +90,6 @@ export default function LoginScreen() {
                 type="button"
                 className="input-toggle"
                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                 onClick={() => setShowPassword(v => !v)}
                 disabled={loading}
               >
@@ -97,13 +100,26 @@ export default function LoginScreen() {
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', fontSize: '15px', marginTop: '4px' }}
+            className="btn btn-primary login-submit"
             disabled={loading}
           >
             {loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : null}
             {loading ? 'Вход...' : 'Войти'}
           </button>
+
+          <div className={`forgot-password${forgotOpen ? ' forgot-password--open' : ''}`}>
+            <button
+              type="button"
+              className="forgot-password__button"
+              onClick={() => setForgotOpen(v => !v)}
+              onBlur={() => setForgotOpen(false)}
+            >
+              Забыли пароль?
+            </button>
+            <div className="forgot-password__hint" role="note">
+              В данной версии панели управления отсутствует возможность восстановления пароля посредством электронной почты. Для восстановления доступа обратитесь к администратору.
+            </div>
+          </div>
         </form>
       </div>
     </div>

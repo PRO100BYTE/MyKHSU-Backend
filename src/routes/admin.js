@@ -110,6 +110,26 @@ function normalizeEmail(value) {
   return email ? email.toLowerCase() : null
 }
 
+function buildAgentDisplayName(user) {
+  const lastName = normalizeNullableText(user?.last_name, 120)
+  const firstName = normalizeNullableText(user?.first_name, 120)
+  const middleName = normalizeNullableText(user?.middle_name, 120)
+
+  if (!lastName && !firstName) {
+    return user?.username ?? 'Агент'
+  }
+
+  const firstInitial = firstName ? `${firstName[0].toUpperCase()}.` : ''
+  const middleInitial = middleName ? `${middleName[0].toUpperCase()}.` : ''
+  const initials = `${firstInitial}${middleInitial}`
+
+  if (!lastName) {
+    return `${firstName}${middleInitial ? ` ${middleInitial}` : ''}`
+  }
+
+  return `${lastName}${initials ? ` ${initials}` : ''}`
+}
+
 const WEEKDAY_NAME_TO_NUM = {
   'понедельник': 1,
   'вторник': 2,
@@ -232,7 +252,7 @@ router.post('/checktoken', requireAuth, (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/profile', requireAuth, (req, res) => {
   const profile = usersDb
-    .prepare('SELECT id, username, is_active, role, first_name, last_name, position, email, created_at, updated_at FROM users WHERE id = ?')
+    .prepare('SELECT id, username, is_active, role, first_name, middle_name, last_name, position, email, created_at, updated_at FROM users WHERE id = ?')
     .get(req.user.uid)
 
   if (!profile) return res.status(404).json({ error: 'User not found' })
@@ -242,7 +262,7 @@ router.get('/profile', requireAuth, (req, res) => {
 
 // ---------------------------------------------------------------------------
 // PATCH /adminapi/profile
-// Body: { username?, first_name?, last_name?, position?, email?, current_password?, new_password? }
+// Body: { username?, first_name?, middle_name?, last_name?, position?, email?, current_password?, new_password? }
 // ---------------------------------------------------------------------------
 router.patch('/profile', requireAuth, async (req, res) => {
   const me = usersDb.prepare('SELECT * FROM users WHERE id = ?').get(req.user.uid)
@@ -265,6 +285,10 @@ router.patch('/profile', requireAuth, async (req, res) => {
   if (req.body?.first_name !== undefined) {
     params.first_name = normalizeNullableText(req.body.first_name, 120)
     updates.push('first_name = @first_name')
+  }
+  if (req.body?.middle_name !== undefined) {
+    params.middle_name = normalizeNullableText(req.body.middle_name, 120)
+    updates.push('middle_name = @middle_name')
   }
   if (req.body?.last_name !== undefined) {
     params.last_name = normalizeNullableText(req.body.last_name, 120)
@@ -307,7 +331,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
 router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res) => {
   const users = usersDb
     .prepare(
-      `SELECT id, username, is_active, role, first_name, last_name, position, email, created_at, updated_at
+      `SELECT id, username, is_active, role, first_name, middle_name, last_name, position, email, created_at, updated_at
        FROM users
        ORDER BY username COLLATE NOCASE`
     )
@@ -319,6 +343,7 @@ router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res)
     is_active: Boolean(u.is_active),
     role: u.role ?? 'admin',
     first_name: u.first_name ?? null,
+    middle_name: u.middle_name ?? null,
     last_name: u.last_name ?? null,
     position: u.position ?? null,
     email: u.email ?? null,
@@ -332,7 +357,7 @@ router.get('/users', requireAuth, requirePermission('users:manage'), (_req, res)
 // Body: { username, password, is_active?, role? }
 // ---------------------------------------------------------------------------
 router.post('/users', requireAuth, requirePermission('users:manage'), async (req, res) => {
-  const { username, password, is_active, role, first_name, last_name, position, email } = req.body ?? {};
+  const { username, password, is_active, role, first_name, middle_name, last_name, position, email } = req.body ?? {};
   const safeUsername = String(username ?? '').trim();
 
   if (!safeUsername || !password) {
@@ -356,13 +381,14 @@ router.post('/users', requireAuth, requirePermission('users:manage'), async (req
   const hash = await argon2.hash(password, { type: argon2.argon2id });
   const now = nowSql();
   const result = usersDb
-    .prepare('INSERT INTO users (username, password, is_active, role, first_name, last_name, position, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO users (username, password, is_active, role, first_name, middle_name, last_name, position, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(
       safeUsername,
       hash,
       is_active === false ? 0 : 1,
       safeRole,
       normalizeNullableText(first_name, 120),
+      normalizeNullableText(middle_name, 120),
       normalizeNullableText(last_name, 120),
       normalizeNullableText(position, 160),
       normalizeEmail(email),
@@ -428,6 +454,10 @@ router.patch('/users/:id', requireAuth, requirePermission('users:manage'), async
   if (req.body?.first_name !== undefined) {
     params.first_name = normalizeNullableText(req.body.first_name, 120)
     updates.push('first_name = @first_name')
+  }
+  if (req.body?.middle_name !== undefined) {
+    params.middle_name = normalizeNullableText(req.body.middle_name, 120)
+    updates.push('middle_name = @middle_name')
   }
   if (req.body?.last_name !== undefined) {
     params.last_name = normalizeNullableText(req.body.last_name, 120)
@@ -918,7 +948,7 @@ router.post('/unified-window/tickets/:id/messages', requireAuth, requirePermissi
   const result = usersDb.prepare(
     `INSERT INTO unified_window_messages (ticket_id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at)
      VALUES (?, 'agent', ?, ?, ?, ?, ?)`
-  ).run(id, req.user.username, encrypted.iv, encrypted.tag, encrypted.data, now)
+  ).run(id, buildAgentDisplayName(req.user), encrypted.iv, encrypted.tag, encrypted.data, now)
 
   // Записать время первого ответа агента если ещё не установлено
   if (!ticket.first_response_at) {

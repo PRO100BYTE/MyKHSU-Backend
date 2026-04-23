@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import { useToast } from '../context/ToastContext';
 
 export default function NewsScreen() {
+  const { showToast } = useToast();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { mode: 'create'|'edit', item?: {...} }
-  const [alert, setAlert] = useState(null);
 
   async function loadNews() {
     const data = await api.getNews(50, 0);
@@ -15,28 +16,37 @@ export default function NewsScreen() {
 
   useEffect(() => { loadNews(); }, []);
 
-  function showAlert(msg, ok = true) {
-    setAlert({ msg, ok });
-    setTimeout(() => setAlert(null), 3500);
-  }
-
   async function handleSave(content, id) {
     let res;
     if (id) res = await api.editNews(id, content);
     else res = await api.createNews(content);
     if (res?.ok) {
-      showAlert(id ? 'Новость обновлена' : 'Новость создана');
+      showToast({ variant: 'success', title: id ? 'Новость обновлена.' : 'Новость создана.' });
       setModal(null);
       loadNews();
     } else {
-      showAlert(res?.data?.error ?? 'Ошибка', false);
+      showToast({
+        variant: 'error',
+        title: 'Не удалось сохранить новость.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-NWS-001',
+      });
     }
   }
 
   async function handleDelete(id) {
     if (!window.confirm('Удалить эту новость?')) return;
-    await api.deleteNews(id);
-    showAlert('Новость удалена');
+    const res = await api.deleteNews(id);
+    if (!res?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось удалить новость.',
+        description: res?.error || '',
+        code: res?.errorCode || 'UI-NWS-002',
+      });
+      return;
+    }
+    showToast({ variant: 'success', title: 'Новость удалена.' });
     loadNews();
   }
 
@@ -58,13 +68,6 @@ export default function NewsScreen() {
           Создать новость
         </button>
       </div>
-
-      {alert && (
-        <div className={`alert ${alert.ok ? 'alert-success' : 'alert-error'}`}>
-          <ion-icon name={alert.ok ? 'checkmark-circle-outline' : 'alert-circle-outline'} />
-          {alert.msg}
-        </div>
-      )}
 
       <div className="card">
         {loading ? (
