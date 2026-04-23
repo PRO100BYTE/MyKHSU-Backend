@@ -16,6 +16,58 @@ import path from 'node:path';
 
 const router = Router();
 
+function addDaysIsoDate(isoDate, days) {
+  const [y, m, d] = String(isoDate || '').split('-').map(Number)
+  if (!y || !m || !d) return null
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + days)
+  return dt.toISOString().slice(0, 10)
+}
+
+function resolveWeekDateBounds(weekNum, courseFilter, groupFilter) {
+  let sql = `
+    SELECT
+      MIN(CASE WHEN date_start IS NOT NULL AND TRIM(date_start) != '' THEN date_start END) AS min_date_start,
+      MAX(CASE WHEN date_end   IS NOT NULL AND TRIM(date_end)   != '' THEN date_end   END) AS max_date_end,
+      MIN(CASE WHEN date       IS NOT NULL AND TRIM(date)       != '' THEN date       END) AS min_date,
+      MAX(CASE WHEN date       IS NOT NULL AND TRIM(date)       != '' THEN date       END) AS max_date
+    FROM pairs
+    WHERE week_number = ?
+  `
+  const params = [weekNum]
+
+  if (courseFilter !== undefined && courseFilter !== null && courseFilter !== '') {
+    const parsedCourse = parseInt(courseFilter, 10)
+    if (!Number.isNaN(parsedCourse)) {
+      sql += ' AND course = ?'
+      params.push(parsedCourse)
+    }
+  }
+
+  if (groupFilter !== undefined && groupFilter !== null && String(groupFilter).trim() !== '') {
+    sql += ' AND group_name = ?'
+    params.push(String(groupFilter).trim())
+  }
+
+  const row = pairsDb.prepare(sql).get(...params)
+
+  let dateStart = row?.min_date_start || row?.min_date || null
+  let dateEnd = row?.max_date_end || row?.max_date || null
+
+  if (dateStart && !dateEnd) {
+    dateEnd = addDaysIsoDate(dateStart, 6)
+  }
+  if (!dateStart && dateEnd) {
+    dateStart = addDaysIsoDate(dateEnd, -6)
+  }
+
+  if (!dateStart || !dateEnd) {
+    return getWeekDates(weekNum)
+  }
+
+  return { dateStart, dateEnd }
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/meta
 // Метаданные версии и сборки
@@ -245,7 +297,7 @@ router.get('/getcourses', (_req, res) => {
 router.get('/getdates', (req, res) => {
   const week = parseInt(req.query.week, 10);
   if (isNaN(week)) return res.status(400).json({ error: 'Missing param: week' });
-  const { dateStart, dateEnd } = getWeekDates(week);
+  const { dateStart } = resolveWeekDateBounds(week, req.query.course, req.query.group)
   // Отдаём массив дат пн-пт
   const dates = [];
   const start = new Date(dateStart);
@@ -260,7 +312,7 @@ router.get('/getdates', (req, res) => {
 router.get('/getdatesextended/:week', (req, res) => {
   const week = parseInt(req.params.week, 10);
   if (isNaN(week)) return res.status(400).json({ error: 'Invalid week number' });
-  const { dateStart, dateEnd } = getWeekDates(week);
+  const { dateStart, dateEnd } = resolveWeekDateBounds(week, req.query.course, req.query.group)
   res.json({ date_start: dateStart, date_end: dateEnd });
 });
 
