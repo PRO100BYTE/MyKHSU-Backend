@@ -1,0 +1,207 @@
+{
+  "Timetable": [
+    {
+      "WeekNumber": 1,
+      "DateStart": "01.09.2026",
+      "DateEnd": "06.09.2026",
+      "Groups": [
+        {
+          "Course": 1,
+          "GroupName": "125-1-1",
+          "Faculty": "ИТИ",
+          "Days": [
+            {
+              "Weekday": 1,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 1,
+                  "Type": "Лекция",
+                  "Subject": "Математика",
+                  "Teachers": [{ "TeacherName": "Стручков Е.А." }],
+                  "Auditories": [{ "AuditoryName": "101" }],
+                  "Date": "01.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                },
+                {
+                  "Time": 2,
+                  "Type": "Практика",
+                  "Subject": "Программирование",
+                  "Teachers": [{ "TeacherName": "Курячий С.Б." }],
+                  "Auditories": [{ "AuditoryName": "305" }],
+                  "Date": "01.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            },
+            {
+              "Weekday": 3,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 3,
+                  "Type": "Лабораторная",
+                  "Subject": "Информатика",
+                  "Teachers": [{ "TeacherName": "Федоренко Н.С." }],
+                  "Auditories": [{ "AuditoryName": "220" }],
+                  "Date": "03.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Course": 1,
+          "GroupName": "125-1-2",
+          "Faculty": "ИТИ",
+          "Days": [
+            {
+              "Weekday": 2,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 1,
+                  "Type": "Лекция",
+                  "Subject": "Алгебра",
+                  "Teachers": [{ "TeacherName": "Стручков Е.А." }],
+                  "Auditories": [{ "AuditoryName": "102" }],
+                  "Date": "02.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                },
+                {
+                  "Time": 4,
+                  "Type": "Практика",
+                  "Subject": "Алгоритмы",
+                  "Teachers": [{ "TeacherName": "Курячий С.Б." }],
+                  "Auditories": [{ "AuditoryName": "312" }],
+                  "Date": "02.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            },
+            {
+              "Weekday": 5,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 2,
+                  "Type": "Лабораторная",
+                  "Subject": "Базы данных",
+                  "Teachers": [{ "TeacherName": "Федоренко Н.С." }],
+                  "Auditories": [{ "AuditoryName": "215" }],
+                  "Date": "05.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Course": 2,
+          "GroupName": "2-1",
+          "Faculty": "ИТИ",
+          "Days": [
+            {
+              "Weekday": 1,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 2,
+                  "Type": "Лекция",
+                  "Subject": "Дискретная математика",
+                  "Teachers": [{ "TeacherName": "Стручков Е.А." }],
+                  "Auditories": [{ "AuditoryName": "201" }],
+                  "Date": "01.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                },
+                {
+                  "Time": 3,
+                  "Type": "Практика",
+                  "Subject": "Архитектура ЭВМ",
+                  "Teachers": [{ "TeacherName": "Тестов Т.Т." }],
+                  "Auditories": [{ "AuditoryName": "410" }],
+                  "Date": "01.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            },
+            {
+              "Weekday": 4,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 1,
+                  "Type": "Лабораторная",
+                  "Subject": "Сети",
+                  "Teachers": [{ "TeacherName": "Иванов И.И." }],
+                  "Auditories": [{ "AuditoryName": "418" }],
+                  "Date": "04.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Course": 2,
+          "GroupName": "2-2",
+          "Faculty": "ИТИ",
+          "Days": [
+            {
+              "Weekday": 2,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 2,
+                  "Type": "Лекция",
+                  "Subject": "Теория вероятностей",
+                  "Teachers": [{ "TeacherName": "Стручков Е.А." }],
+                  "Auditories": [{ "AuditoryName": "205" }],
+                  "Date": "02.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                },
+                {
+                  "Time": 3,
+                  "Type": "Практика",
+                  "Subject": "Операционные системы",
+                  "Teachers": [{ "TeacherName": "Тестов Т.Т." }],
+                  "Auditories": [{ "AuditoryName": "407" }],
+                  "Date": "02.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            },
+            {
+              "Weekday": 6,
+              "WeekNumber": 1,
+              "Lessons": [
+                {
+                  "Time": 1,
+                  "Type": "Лабораторная",
+                  "Subject": "Компьютерная графика",
+                  "Teachers": [{ "TeacherName": "Иванов И.И." }],
+                  "Auditories": [{ "AuditoryName": "402" }],
+                  "Date": "06.09.2026",
+                  "Subgroup": 0,
+                  "Week": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
