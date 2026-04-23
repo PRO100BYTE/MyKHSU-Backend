@@ -141,6 +141,17 @@ export default function NewsScreen() {
 function NewsModal({ mode, item, onSave, onClose }) {
   const [content, setContent] = useState(item?.content ?? '');
   const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => setVisible(true));
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+
+  function closeWithAnimation() {
+    setVisible(false);
+    window.setTimeout(() => onClose(), 220);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -151,11 +162,14 @@ function NewsModal({ mode, item, onSave, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div
+      className={`modal-overlay${visible ? ' modal-overlay--open' : ''}`}
+      onClick={e => e.target === e.currentTarget && closeWithAnimation()}
+    >
       <div className="modal">
         <div className="modal__header">
           <div className="modal__title">{mode === 'create' ? 'Создать новость' : 'Редактировать новость'}</div>
-          <button className="btn-icon" onClick={onClose}><ion-icon name="close-outline" /></button>
+          <button className="btn-icon" onClick={closeWithAnimation}><ion-icon name="close-outline" /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal__body">
@@ -172,7 +186,7 @@ function NewsModal({ mode, item, onSave, onClose }) {
             </div>
           </div>
           <div className="modal__footer">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Отмена</button>
+            <button type="button" className="btn btn-ghost" onClick={closeWithAnimation}>Отмена</button>
             <button type="submit" className="btn btn-primary" disabled={loading || !content.trim()}>
               {loading ? <span className="spinner spinner-sm" /> : null}
               {mode === 'create' ? 'Создать' : 'Сохранить'}
