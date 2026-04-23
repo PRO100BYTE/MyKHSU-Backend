@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext'
 import { useConfirmDialog } from '../context/ConfirmDialogContext'
 import { formatDateTimeKrasnoyarsk } from '../utils/datetime'
 import { useAnimatedVisibility } from '../hooks/useAnimatedVisibility'
+import { findProfanity } from '../utils/profanityDictionary'
 
 const STATUSES = [
   { value: '', label: 'Все статусы' },
@@ -130,7 +131,9 @@ export default function UnifiedWindowScreen() {
   const sendMessage = async () => {
     if (!selected) return
 
-    if (!form.responseText.trim()) {
+    const safeResponse = form.responseText.trim()
+
+    if (!safeResponse) {
       showToast({
         variant: 'warning',
         title: 'Введите текст сообщения перед отправкой.',
@@ -139,9 +142,19 @@ export default function UnifiedWindowScreen() {
       return
     }
 
+    if (findProfanity(safeResponse).hasProfanity) {
+      showToast({
+        variant: 'error',
+        title: 'Обнаружены недопустимые выражения в сообщении.',
+        description: 'Отредактируйте сообщение и используйте более корректные выражения.',
+        code: 'UI-UW-010',
+      })
+      return
+    }
+
     setSaving(true)
 
-    const messageResp = await api.postUwMessage(selected.id, form.responseText.trim())
+    const messageResp = await api.postUwMessage(selected.id, safeResponse)
     if (!messageResp?.ok) {
       setSaving(false)
       showRequestError('Не удалось отправить ответ по обращению.', messageResp)
