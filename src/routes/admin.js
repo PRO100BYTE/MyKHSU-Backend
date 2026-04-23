@@ -808,6 +808,26 @@ router.post('/catalog/courses', requireAuth, requirePermission('schedule:write')
   res.json({ ok: true, inserted: result.changes > 0 })
 })
 
+router.delete('/catalog/courses/:course', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const course = parseInt(req.params.course, 10)
+  if (Number.isNaN(course) || course < -1 || course > 10) {
+    return res.status(400).json({ error: 'course must be an integer between -1 and 10' })
+  }
+
+  const exists = pairsDb.prepare('SELECT 1 FROM course_catalog WHERE course = ?').get(course)
+  if (!exists) {
+    return res.status(404).json({ error: 'course not found' })
+  }
+
+  const tx = pairsDb.transaction((value) => {
+    pairsDb.prepare('DELETE FROM group_catalog WHERE course = ?').run(value)
+    pairsDb.prepare('DELETE FROM course_catalog WHERE course = ?').run(value)
+  })
+
+  tx(course)
+  res.json({ ok: true })
+})
+
 router.get('/catalog/groups', requireAuth, requirePermission('schedule:write'), (req, res) => {
   const courseFilter = req.query?.course
   if (courseFilter !== undefined && courseFilter !== '') {

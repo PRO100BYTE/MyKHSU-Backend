@@ -99,6 +99,7 @@ const api = {
   deletePair: (id) => request('DELETE', `/pairs/${id}`),
   getCatalogCourses: () => request('GET', '/catalog/courses'),
   createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
+  deleteCatalogCourse: (course) => request('DELETE', `/catalog/courses/${encodeURIComponent(course)}`),
   getCatalogGroups: (course) => request('GET', `/catalog/groups${course !== undefined && course !== '' ? `?course=${course}` : ''}`),
   createCatalogGroup: (payload) => request('POST', '/catalog/groups', payload),
   updateCatalogGroup: (id, payload) => request('PATCH', `/catalog/groups/${id}`, payload),

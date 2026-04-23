@@ -693,6 +693,14 @@
 
 ---
 
+### DELETE `/adminapi/catalog/courses/{course}`
+
+Удалить курс из ручного каталога. Одновременно удаляются все группы этого курса из `group_catalog`.
+
+**Response:** `{ "ok": true }`
+
+---
+
 ### GET `/adminapi/catalog/groups`
 
 **Query-параметры:** `course` (number, необязателен)
