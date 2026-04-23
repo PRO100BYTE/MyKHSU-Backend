@@ -111,8 +111,10 @@ export default function UsersScreen() {
 
   function closeModal() {
     setIsModalOpen(false);
-    setEditTarget(null);
-    setForm(EMPTY_FORM);
+    window.setTimeout(() => {
+      setEditTarget(null);
+      setForm(EMPTY_FORM);
+    }, 220);
   }
 
   async function onSubmit(event) {

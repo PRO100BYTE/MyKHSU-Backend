@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useAnimatedVisibility } from '../hooks/useAnimatedVisibility'
 
 const ConfirmDialogContext = createContext(null)
@@ -13,8 +13,20 @@ const DEFAULT_OPTIONS = {
 
 export function ConfirmDialogProvider({ children }) {
   const [dialog, setDialog] = useState(null)
+  const [renderedDialog, setRenderedDialog] = useState(null)
   const resolverRef = useRef(null)
   const visibility = useAnimatedVisibility(Boolean(dialog))
+
+  useEffect(() => {
+    if (dialog) {
+      setRenderedDialog(dialog)
+      return
+    }
+
+    if (!visibility.isRendered) {
+      setRenderedDialog(null)
+    }
+  }, [dialog, visibility.isRendered])
 
   const closeWithResult = useCallback((result) => {
     const resolver = resolverRef.current
@@ -36,22 +48,22 @@ export function ConfirmDialogProvider({ children }) {
   return (
     <ConfirmDialogContext.Provider value={value}>
       {children}
-      {visibility.isRendered && dialog ? (
+      {visibility.isRendered && renderedDialog ? (
         <div className={`modal-overlay${visibility.isVisible ? ' modal-overlay--open' : ''}`} onClick={() => closeWithResult(false)}>
           <div className="modal" onClick={event => event.stopPropagation()}>
             <div className="modal__header">
-              <h3 className="modal__title">{dialog.title}</h3>
+              <h3 className="modal__title">{renderedDialog.title}</h3>
             </div>
             <div className="modal__body">
-              <p className="muted" style={{ margin: 0 }}>{dialog.message}</p>
+              <p className="muted" style={{ margin: 0 }}>{renderedDialog.message}</p>
             </div>
             <div className="modal__footer">
-              <button className="btn" onClick={() => closeWithResult(false)}>{dialog.cancelText}</button>
+              <button className="btn" onClick={() => closeWithResult(false)}>{renderedDialog.cancelText}</button>
               <button
-                className={`btn ${dialog.danger ? 'btn-danger' : 'btn-primary'}`}
+                className={`btn ${renderedDialog.danger ? 'btn-danger' : 'btn-primary'}`}
                 onClick={() => closeWithResult(true)}
               >
-                {dialog.confirmText}
+                {renderedDialog.confirmText}
               </button>
             </div>
           </div>
