@@ -1,0 +1,11 @@
+[Unit]
+Description=Scheduled restart for MyKHSU Backend (with pre-start update)
+
+[Timer]
+# Every day at 04:30 local time
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+Unit=mykhsu-backend-restart.service
+
+[Install]
+WantedBy=timers.target

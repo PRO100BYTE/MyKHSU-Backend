@@ -1,0 +1,11 @@
+[Unit]
+Description=Update MyKHSU Backend from Git now (with build), then restart service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/mykhsu/mykhsu-backend.env
+Environment=MYKHSU_GIT_FORCE_UPDATE=1
+ExecStart=/usr/bin/bash /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend-update.sh
+ExecStart=/usr/bin/systemctl restart mykhsu-backend.service

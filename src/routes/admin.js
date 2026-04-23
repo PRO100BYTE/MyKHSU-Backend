@@ -411,6 +411,37 @@ function addDaysToIsoDate(isoDate, days) {
   return utc.toISOString().slice(0, 10)
 }
 
+function formatIsoToDmy(isoDate) {
+  if (!isoDate) return null
+  const [year, month, day] = String(isoDate).split('-')
+  if (!year || !month || !day) return null
+  return `${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`
+}
+
+function resolveWeekDateBoundsForExport(courseValue, groupName, weekValue) {
+  const row = pairsDb.prepare(
+    `SELECT
+       MIN(CASE WHEN date_start IS NOT NULL AND TRIM(date_start) != '' THEN date_start END) AS min_date_start,
+       MAX(CASE WHEN date_end   IS NOT NULL AND TRIM(date_end)   != '' THEN date_end   END) AS max_date_end,
+       MIN(CASE WHEN date       IS NOT NULL AND TRIM(date)       != '' THEN date       END) AS min_date,
+       MAX(CASE WHEN date       IS NOT NULL AND TRIM(date)       != '' THEN date       END) AS max_date
+     FROM pairs
+     WHERE course = ? AND group_name = ? AND week_number = ?`
+  ).get(courseValue, groupName, weekValue)
+
+  let dateStart = row?.min_date_start || row?.min_date || null
+  let dateEnd = row?.max_date_end || row?.max_date || null
+
+  if (dateStart && !dateEnd) dateEnd = addDaysToIsoDate(dateStart, 6)
+  if (!dateStart && dateEnd) dateStart = addDaysToIsoDate(dateEnd, -6)
+
+  if (!dateStart || !dateEnd) {
+    return getWeekDates(weekValue)
+  }
+
+  return { dateStart, dateEnd }
+}
+
 // ---------------------------------------------------------------------------
 // POST /adminapi/login  (также /admin/login)
 // Body: { username, password }
@@ -1101,6 +1132,151 @@ router.post('/updatepairs', requireAuth, requirePermission('schedule:write'), (r
   run();
   res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// GET /adminapi/schedule/export
+// Query: course, group, week_number
+// ---------------------------------------------------------------------------
+router.get('/schedule/export', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const course = parseInt(req.query.course, 10)
+  const weekNumber = parseInt(req.query.week_number, 10)
+  const groupName = String(req.query.group ?? '').trim()
+
+  if (Number.isNaN(course)) return res.status(400).json({ error: 'course must be a number' })
+  if (Number.isNaN(weekNumber)) return res.status(400).json({ error: 'week_number must be a number' })
+  if (!groupName) return res.status(400).json({ error: 'group is required' })
+
+  const rows = pairsDb.prepare(
+    `SELECT p.*, t.time AS time_number
+     FROM pairs p
+     LEFT JOIN times t ON p.time = t.id
+     WHERE p.course = ? AND p.group_name = ? AND p.week_number = ?
+     ORDER BY p.weekday, p.time`
+  ).all(course, groupName, weekNumber)
+
+  const { dateStart, dateEnd } = resolveWeekDateBoundsForExport(course, groupName, weekNumber)
+
+  const daysMap = new Map()
+  for (const row of rows) {
+    const weekday = Number(row.weekday)
+    if (!weekday || weekday < 1 || weekday > 7) continue
+
+    if (!daysMap.has(weekday)) {
+      daysMap.set(weekday, {
+        Weekday: weekday,
+        WeekNumber: weekNumber,
+        Lessons: [],
+      })
+    }
+
+    daysMap.get(weekday).Lessons.push({
+      Time: row.time_number ?? row.time ?? null,
+      Type: row.type ?? '',
+      Subject: row.subject ?? '',
+      Teachers: row.teacher ? [{ TeacherName: row.teacher }] : [],
+      Auditories: row.auditory ? [{ AuditoryName: row.auditory }] : [],
+      Date: formatIsoToDmy(row.date) ?? null,
+      Subgroup: 0,
+      Week: weekNumber,
+    })
+  }
+
+  const payload = {
+    Timetable: [
+      {
+        WeekNumber: weekNumber,
+        DateStart: formatIsoToDmy(dateStart),
+        DateEnd: formatIsoToDmy(dateEnd),
+        Groups: [
+          {
+            Course: course,
+            GroupName: groupName,
+            Faculty: '',
+            Days: Array.from(daysMap.values()),
+          },
+        ],
+      },
+    ],
+  }
+
+  const safeGroup = groupName.replace(/[^a-zA-Z0-9._-]+/g, '_')
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="schedule_${safeGroup}_w${weekNumber}.json"`)
+  res.send(JSON.stringify(payload, null, 2))
+})
+
+// ---------------------------------------------------------------------------
+// POST /adminapi/schedule/copy
+// Body: { source_course, source_group, source_week_number, target_course, target_group, target_week_number, replace_target? }
+// ---------------------------------------------------------------------------
+router.post('/schedule/copy', requireAuth, requirePermission('schedule:write'), (req, res) => {
+  const sourceCourse = parseInt(req.body?.source_course, 10)
+  const sourceWeekNumber = parseInt(req.body?.source_week_number, 10)
+  const sourceGroup = String(req.body?.source_group ?? '').trim()
+
+  const targetCourse = parseInt(req.body?.target_course, 10)
+  const targetWeekNumber = parseInt(req.body?.target_week_number, 10)
+  const targetGroup = String(req.body?.target_group ?? '').trim()
+  const replaceTarget = req.body?.replace_target !== false
+
+  if (Number.isNaN(sourceCourse) || Number.isNaN(sourceWeekNumber) || !sourceGroup) {
+    return res.status(400).json({ error: 'source_course, source_group, source_week_number are required' })
+  }
+  if (Number.isNaN(targetCourse) || Number.isNaN(targetWeekNumber) || !targetGroup) {
+    return res.status(400).json({ error: 'target_course, target_group, target_week_number are required' })
+  }
+
+  const sourceRows = pairsDb.prepare(
+    `SELECT * FROM pairs
+     WHERE course = ? AND group_name = ? AND week_number = ?
+     ORDER BY weekday, time`
+  ).all(sourceCourse, sourceGroup, sourceWeekNumber)
+
+  if (!sourceRows.length) {
+    return res.status(404).json({ error: 'Source schedule is empty' })
+  }
+
+  const diffWeeks = targetWeekNumber - sourceWeekNumber
+  const insert = pairsDb.prepare(
+    `INSERT INTO pairs
+      (week_number, weekday, course, group_name, date, time, type, subject, teacher, auditory, date_start, date_end)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+
+  const tx = pairsDb.transaction(() => {
+    if (replaceTarget) {
+      pairsDb.prepare('DELETE FROM pairs WHERE course = ? AND group_name = ? AND week_number = ?').run(targetCourse, targetGroup, targetWeekNumber)
+    }
+
+    const now = nowSql()
+    pairsDb.prepare('INSERT OR IGNORE INTO course_catalog (course, created_at) VALUES (?, ?)').run(targetCourse, now)
+    pairsDb.prepare('INSERT OR IGNORE INTO group_catalog (course, group_name, created_at) VALUES (?, ?, ?)').run(targetCourse, targetGroup, now)
+
+    for (const row of sourceRows) {
+      const nextDate = row.date ? addDaysToIsoDate(row.date, diffWeeks * 7) : null
+      const nextDateStart = row.date_start ? addDaysToIsoDate(row.date_start, diffWeeks * 7) : null
+      const nextDateEnd = row.date_end ? addDaysToIsoDate(row.date_end, diffWeeks * 7) : null
+
+      insert.run(
+        targetWeekNumber,
+        row.weekday ?? null,
+        targetCourse,
+        targetGroup,
+        nextDate,
+        row.time ?? null,
+        row.type ?? null,
+        row.subject ?? null,
+        row.teacher ?? null,
+        row.auditory ?? null,
+        nextDateStart,
+        nextDateEnd,
+      )
+    }
+  })
+
+  tx()
+  res.json({ ok: true, copied: sourceRows.length, replaced: replaceTarget })
+})
 
 // ---------------------------------------------------------------------------
 // POST /adminapi/updatetimes  — CRUD расписания звонков

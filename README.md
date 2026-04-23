@@ -163,6 +163,25 @@ MyKHSU-Backend/
 - [docs/deployment.md](docs/deployment.md) — Руководство по развёртыванию
 - [docs/frontend.md](docs/frontend.md) — Подключение MyKHSU-web и admin-panel
 
+## systemd (Ubuntu 24.04)
+
+В репозитории есть готовые файлы для запуска как службы:
+
+- `deploy/systemd/mykhsu-backend.service`
+- `deploy/systemd/mykhsu-backend-restart.service`
+- `deploy/systemd/mykhsu-backend-restart.timer`
+- `deploy/systemd/mykhsu-backend-update-now.service`
+- `deploy/systemd/mykhsu-backend-update.sh`
+- `deploy/systemd/mykhsu-backend.env.example`
+
+Служба поддерживает auto-update при старте/рестарте (через `ExecStartPre`):
+
+1. `git pull --ff-only --recurse-submodules`
+2. `npm ci --omit=dev`
+3. `npm run build`
+
+Подробные команды установки и включения таймера: [docs/deployment.md](docs/deployment.md).
+
 ## Связь с оригиналом (raspisanie)
 
 Этот бэкенд — Node.js-переработка Go-проекта [`raspisanie`](raspisanie/). Использованы материалы из веток:

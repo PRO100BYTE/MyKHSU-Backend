@@ -22,43 +22,100 @@ npm run build              # Собрать всё вместе (admin + web)
 npm start
 ```
 
-## Продакшн (systemd / Linux)
+## Продакшн (systemd / Ubuntu 24.04)
 
-Создайте файл `/etc/systemd/system/mykhsu.service`:
+В репозитории уже подготовлены unit-файлы:
 
-```ini
-[Unit]
-Description=MyKHSU Backend
-After=network.target
+- `deploy/systemd/mykhsu-backend.service`
+- `deploy/systemd/mykhsu-backend-restart.service`
+- `deploy/systemd/mykhsu-backend-restart.timer`
+- `deploy/systemd/mykhsu-backend-update-now.service`
+- `deploy/systemd/mykhsu-backend-update.sh`
+- `deploy/systemd/mykhsu-backend.env.example`
 
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/mykhsu-backend
-EnvironmentFile=/opt/mykhsu-backend/.env
-ExecStart=/usr/bin/node src/index.js
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/opt/mykhsu-backend/data /opt/mykhsu-backend/settings.json
+### 1) Подготовить системного пользователя и директории
 
-[Install]
-WantedBy=multi-user.target
+```bash
+sudo useradd --system --create-home --shell /usr/sbin/nologin mykhsu || true
+sudo mkdir -p /opt/mykhsu
+sudo chown -R mykhsu:mykhsu /opt/mykhsu
 ```
+
+### 2) Разместить приложение
+
+```bash
+sudo -u mykhsu git clone <repo-url> /opt/mykhsu/MyKHSU-Backend
+cd /opt/mykhsu/MyKHSU-Backend
+sudo -u mykhsu git submodule update --init --recursive
+sudo -u mykhsu npm ci --omit=dev
+sudo -u mykhsu npm run build
+```
+
+### 3) Настроить env-файл службы
+
+```bash
+sudo mkdir -p /etc/mykhsu
+sudo cp /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend.env.example /etc/mykhsu/mykhsu-backend.env
+sudo chmod 600 /etc/mykhsu/mykhsu-backend.env
+sudo chown root:root /etc/mykhsu/mykhsu-backend.env
+```
+
+Отредактируйте `/etc/mykhsu/mykhsu-backend.env` и обязательно задайте `JWT_SECRET`.
+
+Для автообновления при каждом старте/рестарте оставьте:
+
+```dotenv
+MYKHSU_GIT_AUTOUPDATE=1
+MYKHSU_GIT_BRANCH=main
+MYKHSU_APP_DIR=/opt/mykhsu/MyKHSU-Backend
+```
+
+### 4) Установить unit-файлы
+
+```bash
+sudo cp /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend.service /etc/systemd/system/
+sudo cp /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend-restart.service /etc/systemd/system/
+sudo cp /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend-restart.timer /etc/systemd/system/
+sudo cp /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend-update-now.service /etc/systemd/system/
+sudo chmod +x /opt/mykhsu/MyKHSU-Backend/deploy/systemd/mykhsu-backend-update.sh
+```
+
+### 5) Запустить службу
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable mykhsu
-sudo systemctl start mykhsu
-sudo journalctl -u mykhsu -f
+sudo systemctl enable --now mykhsu-backend.service
+sudo systemctl status mykhsu-backend.service
+sudo journalctl -u mykhsu-backend.service -f
 ```
+
+### 6) Включить плановый рестарт с автообновлением (опционально)
+
+Таймер по умолчанию перезапускает сервис ежедневно в `04:30`, и перед стартом срабатывает `ExecStartPre`-скрипт, который делает `git pull --ff-only`, `npm ci --omit=dev` и `npm run build`.
+
+```bash
+sudo systemctl enable --now mykhsu-backend-restart.timer
+sudo systemctl list-timers | grep mykhsu
+```
+
+### Ручное обновление через systemd
+
+```bash
+sudo systemctl restart mykhsu-backend.service
+```
+
+Принудительное обновление «прямо сейчас» (даже если SHA не изменился), затем перезапуск сервиса:
+
+```bash
+sudo systemctl start mykhsu-backend-update-now.service
+```
+
+Если в рабочем каталоге есть локальные незакоммиченные изменения, auto-update будет пропущен (защита от потери локальных правок).
 
 ## Nginx (reverse proxy)
 
 На одном порту `8080` сервер отдаёт сразу:
+
 - `/api/*` и `/adminapi/*` (API)
 - `/admin-panel/*` (React Admin Panel)
 - `/` (MyKHSU-web)
@@ -153,7 +210,7 @@ services:
 ## Переменные окружения (полный список)
 
 | Переменная | Обязательна | По умолчанию | Описание |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `JWT_SECRET` | **ДА** | — | Секрет JWT, минимум 32 символа |
 | `PORT` | нет | `8080` | TCP-порт |
 | `HOST` | нет | `0.0.0.0` | Адрес прослушивания |

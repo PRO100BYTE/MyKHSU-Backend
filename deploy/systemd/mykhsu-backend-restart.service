@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart MyKHSU Backend (triggers pre-start Git update)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart mykhsu-backend.service
