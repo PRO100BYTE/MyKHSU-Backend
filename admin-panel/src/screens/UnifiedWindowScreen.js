@@ -83,7 +83,7 @@ export default function UnifiedWindowScreen() {
   }
 
   useEffect(() => {
-    fetchTickets(ticketId)
+    fetchTickets(selectedId)
   }, [statusFilter])
 
   const openTicket = async (ticketId) => {
@@ -105,7 +105,7 @@ export default function UnifiedWindowScreen() {
       status: resp.data?.status || 'open',
       comment: '',
     })
-    fetchTickets(selected.id)
+    fetchTickets(ticketId)
   }
 
   const counts = useMemo(() => {

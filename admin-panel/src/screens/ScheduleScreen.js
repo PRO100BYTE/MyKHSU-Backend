@@ -873,10 +873,18 @@ function UploadTab() {
 
 function DeleteTab() {
   const { showToast } = useToast();
-  const [confirm, setConfirm] = useState(false);
+  const { confirm } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
+    const accepted = await confirm({
+      title: 'Очистка расписания',
+      message: 'Удалить все записи из таблицы pairs? Действие необратимо.',
+      confirmText: 'Очистить',
+      danger: true,
+    });
+    if (!accepted) return;
+
     setLoading(true);
     const res = await api.deletePairsTable();
     setLoading(false);
@@ -890,7 +898,6 @@ function DeleteTab() {
       return;
     }
     showToast({ variant: 'success', title: 'Расписание успешно очищено.' });
-    setConfirm(false);
   }
 
   return (
@@ -909,25 +916,10 @@ function DeleteTab() {
           Это действие нельзя отменить. Все пары будут удалены безвозвратно.
         </div>
 
-        {!confirm ? (
-          <button className="btn btn-danger" onClick={() => setConfirm(true)} style={{ alignSelf: 'flex-start' }}>
-            <ion-icon name="trash-outline" />
-            Очистить расписание
-          </button>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              Вы уверены? Все данные расписания будут удалены.
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-danger" onClick={handleDelete} disabled={loading}>
-                {loading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <ion-icon name="trash-outline" />}
-                Да, удалить
-              </button>
-              <button className="btn btn-ghost" onClick={() => setConfirm(false)}>Отмена</button>
-            </div>
-          </div>
-        )}
+        <button className="btn btn-danger" onClick={handleDelete} disabled={loading} style={{ alignSelf: 'flex-start' }}>
+          {loading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <ion-icon name="trash-outline" />}
+          Очистить расписание
+        </button>
       </div>
     </div>
   );
