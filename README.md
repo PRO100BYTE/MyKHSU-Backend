@@ -112,6 +112,7 @@ MyKHSU-Backend/
 | `npm run start:all` | Алиас единого запуска |
 | `npm run dev` | Запуск с автоперезагрузкой при изменениях |
 | `npm run build` | Единая сборка всего приложения |
+| `npm run build:meta` | Синхронизировать build-метаданные (версии из `src/constants.js`, git hash, дата сборки GMT+7) |
 | `npm run build:all` | То же, что build (единый frontend bundle, web optional) |
 | `npm run seed` | Создание начальных администраторов (admin, TheDayG0ne) |
 | `npm run create-admin <user> <pass>` | Создать/обновить одного администратора |
@@ -131,12 +132,24 @@ MyKHSU-Backend/
 - `src/constants.js` — основной источник для backend/API
 - `admin-panel/src/constants.js` — fallback-значения интерфейса
 
+При `npm run build`, `npm run build:web`, `npm run build:admin`, `npm run start` и `npm run dev` автоматически запускается `scripts/sync-build-info.js`, который:
+
+- берёт версии из `src/constants.js`;
+- подставляет актуальный git hash (`git rev-parse --short HEAD`);
+- обновляет дату сборки в часовом поясе Красноярска (`Asia/Krasnoyarsk`, GMT+7);
+- генерирует `src/build-info.generated.js` для backend;
+- генерирует `.env.production.local` для `admin-panel` и `mykhsu-web`.
+
 Публичный эндпоинт `GET /api/meta` возвращает:
 
 - `api_version`
 - `app_version`
 - `build_number`
 - `build_date`
+- `build_date_human`
+- `git_commit_hash`
+- `build_timezone`
+- `build_timezone_label`
 
 ## Документация
 
