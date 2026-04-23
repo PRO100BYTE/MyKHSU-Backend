@@ -61,12 +61,6 @@ function ManualTab() {
   const [course, setCourse] = useState('1');
   const [group, setGroup] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
-  const [date, setDate] = useState('');
-  const [mode, setMode] = useState('day');
-  const [weekday, setWeekday] = useState('Понедельник');
-  const [catalogCourse, setCatalogCourse] = useState('');
-  const [catalogGroupCourse, setCatalogGroupCourse] = useState('1');
-  const [catalogGroupName, setCatalogGroupName] = useState('');
   const [lessons, setLessons] = useState([EMPTY_LESSON]);
   const [courses, setCourses] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -132,70 +126,9 @@ function ManualTab() {
     setLessons(prev => prev.filter((_, i) => i !== index));
   };
 
-  const createCatalogCourse = async () => {
-    const num = Number.parseInt(catalogCourse, 10);
-    if (Number.isNaN(num)) {
-      showToast({ variant: 'warning', title: 'Введите номер курса.', code: 'UI-SCH-001' });
-      return;
-    }
-    const resp = await api.createCatalogCourse(num);
-    if (!resp?.ok) {
-      showToast({
-        variant: 'error',
-        title: 'Не удалось добавить курс.',
-        description: resp?.error || '',
-        code: resp?.errorCode || 'UI-SCH-002',
-      });
-      return;
-    }
-    setCatalogCourse('');
-    showToast({
-      variant: 'success',
-      title: resp.data?.inserted ? 'Курс добавлен в каталог.' : 'Курс уже существует в каталоге.',
-    });
-
-    const coursesResp = await api.getCourses();
-    const fetchedCourses = Array.isArray(coursesResp) ? coursesResp : [];
-    setCourses(
-      fetchedCourses
-        .map(item => parseInt(item, 10))
-        .filter(item => !Number.isNaN(item))
-        .sort((a, b) => a - b)
-    );
-  };
-
-  const createCatalogGroup = async () => {
-    if (!catalogGroupName.trim()) {
-      showToast({ variant: 'warning', title: 'Введите название группы.', code: 'UI-SCH-003' });
-      return;
-    }
-    const resp = await api.createCatalogGroup({ course: Number.parseInt(catalogGroupCourse, 10), group_name: catalogGroupName.trim() });
-    if (!resp?.ok) {
-      showToast({
-        variant: 'error',
-        title: 'Не удалось добавить группу.',
-        description: resp?.error || '',
-        code: resp?.errorCode || 'UI-SCH-004',
-      });
-      return;
-    }
-    setCatalogGroupName('');
-    showToast({
-      variant: 'success',
-      title: resp.data?.inserted ? 'Группа добавлена в каталог.' : 'Группа уже существует в каталоге.',
-    });
-
-    const selectedCourse = parseInt(course, 10);
-    if (!Number.isNaN(selectedCourse)) {
-      const groupsResp = await api.getGroups(selectedCourse);
-      const fetchedGroups = Array.isArray(groupsResp) ? groupsResp : [];
-      setGroups(fetchedGroups);
-    }
-  };
-
   const submitManual = async () => {
     if (!group.trim()) {
-      showToast({ variant: 'warning', title: 'Укажите группу.', code: 'UI-SCH-005' });
+      showToast({ variant: 'warning', title: 'Укажите группу.', code: 'UI-SCH-001' });
       return;
     }
 
@@ -204,7 +137,7 @@ function ManualTab() {
       .filter((item) => item.time || item.subject || item.teacher || item.auditory || item.type);
 
     if (!cleaned.length) {
-      showToast({ variant: 'warning', title: 'Добавьте хотя бы одну строку пары.', code: 'UI-SCH-006' });
+      showToast({ variant: 'warning', title: 'Добавьте хотя бы одну строку пары.', code: 'UI-SCH-002' });
       return;
     }
 
@@ -214,45 +147,42 @@ function ManualTab() {
     const parsedWeek = parseInt(weekNumber, 10);
     if (Number.isNaN(parsedCourse)) {
       setLoading(false);
-      showToast({ variant: 'warning', title: 'Курс должен быть числом.', code: 'UI-SCH-007' });
+      showToast({ variant: 'warning', title: 'Курс должен быть числом.', code: 'UI-SCH-003' });
       return;
     }
     if (Number.isNaN(parsedWeek)) {
       setLoading(false);
-      showToast({ variant: 'warning', title: 'Номер недели должен быть числом.', code: 'UI-SCH-008' });
+      showToast({ variant: 'warning', title: 'Номер недели должен быть числом.', code: 'UI-SCH-004' });
       return;
     }
 
-    if (mode === 'day') {
+    const accepted = await confirm({
+      title: 'Сохранение расписания',
+      message: `Сохранить расписание для группы ${group.trim()} на неделю ${parsedWeek}?`,
+      confirmText: 'Сохранить',
+    })
+    if (!accepted) {
+      setLoading(false)
+      return
+    }
+
+    for (const chunk of groupedWeekRows) {
+      const filteredLessons = chunk.rows
+        .map(item => ({ ...item, method: 'create' }))
+        .filter(item => item.time || item.subject || item.teacher || item.auditory || item.type)
+        .map(({ weekday: ignoredWeekday, ...rest }) => rest)
+
+      if (!filteredLessons.length) continue
+
       const payload = {
         group: group.trim(),
         course: parsedCourse,
-        date,
         week_number: parsedWeek,
-        weekday,
-        lessons: cleaned.map(({ weekday: ignoredWeekday, ...rest }) => rest),
+        weekday: chunk.day,
+        lessons: filteredLessons,
       };
       resp = await api.updatePairs(payload);
-    } else {
-      for (const chunk of groupedWeekRows) {
-        const filteredLessons = chunk.rows
-          .map(item => ({ ...item, method: 'create' }))
-          .filter(item => item.time || item.subject || item.teacher || item.auditory || item.type)
-          .map(({ weekday: ignoredWeekday, ...rest }) => rest)
-
-        if (!filteredLessons.length) continue
-
-        const payload = {
-          group: group.trim(),
-          course: parsedCourse,
-          date,
-          week_number: parsedWeek,
-          weekday: chunk.day,
-          lessons: filteredLessons,
-        };
-        resp = await api.updatePairs(payload);
-        if (!resp?.ok) break;
-      }
+      if (!resp?.ok) break;
     }
 
     setLoading(false);
@@ -261,7 +191,7 @@ function ManualTab() {
         variant: 'error',
         title: 'Не удалось сохранить расписание.',
         description: resp?.error || '',
-        code: resp?.errorCode || 'UI-SCH-009',
+        code: resp?.errorCode || 'UI-SCH-005',
       });
       return;
     }
@@ -272,59 +202,31 @@ function ManualTab() {
     <div className="card">
       <div className="card__header">
         <div>
-          <div className="card__title">Ручное наполнение</div>
-          <div className="card__subtitle">Курсы, группы и пары по дню или неделе</div>
+          <div className="card__title">Ручное редактирование</div>
+          <div className="card__subtitle">Выберите курс, группу и неделю, затем заполните пары в табличном виде</div>
         </div>
       </div>
       <div className="card__body" style={{ display: 'grid', gap: 14 }}>
         <div className="table-wrap" style={{ padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Добавить курс</div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input className="input" placeholder="Номер курса" value={catalogCourse} onChange={e => setCatalogCourse(e.target.value)} />
-            <button className="btn" onClick={createCatalogCourse}>Добавить курс</button>
-          </div>
-
-          <div style={{ fontWeight: 600, margin: '16px 0 8px' }}>Добавить группу</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <input className="input" placeholder="Курс" value={catalogGroupCourse} onChange={e => setCatalogGroupCourse(e.target.value)} style={{ maxWidth: 100 }} />
-            <input className="input" placeholder="Название группы" value={catalogGroupName} onChange={e => setCatalogGroupName(e.target.value)} style={{ minWidth: 220 }} />
-            <button className="btn" onClick={createCatalogGroup}>Добавить группу</button>
-          </div>
-        </div>
-
-        <div className="table-wrap" style={{ padding: 12 }}>
-          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))' }}>
             <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
               {!courses.length ? <option value="">Нет курсов</option> : null}
               {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
             </select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select className="select" value={group} onChange={e => setGroup(e.target.value)} style={{ width: '100%' }}>
-                {!groups.length ? <option value="">Нет групп</option> : null}
-                {groups.map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </div>
-            <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
-            <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-            <select className="select" value={mode} onChange={e => setMode(e.target.value)}>
-              <option value="day">По дню</option>
-              <option value="week">По неделе</option>
+            <select className="select" value={group} onChange={e => setGroup(e.target.value)} style={{ width: '100%' }}>
+              {!groups.length ? <option value="">Нет групп</option> : null}
+              {groups.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
+            <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
           </div>
 
           <input className="input" placeholder="Или введите группу вручную" value={group} onChange={e => setGroup(e.target.value)} style={{ marginTop: 10 }} />
-
-          {mode === 'day' ? (
-            <select className="select" style={{ marginTop: 10, maxWidth: 220 }} value={weekday} onChange={e => setWeekday(e.target.value)}>
-              {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          ) : null}
 
           <div className="table-wrap" style={{ marginTop: 12 }}>
             <table className="table">
               <thead>
                 <tr>
-                  {mode === 'week' ? <th>День</th> : null}
+                  <th>День</th>
                   <th>Время</th>
                   <th>Тип</th>
                   <th>Предмет</th>
@@ -336,13 +238,11 @@ function ManualTab() {
               <tbody>
                 {lessons.map((row, i) => (
                   <tr key={i}>
-                    {mode === 'week' ? (
-                      <td>
-                        <select className="select" value={row.weekday || 'Понедельник'} onChange={e => updateLesson(i, 'weekday', e.target.value)}>
-                          {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                      </td>
-                    ) : null}
+                    <td>
+                      <select className="select" value={row.weekday || 'Понедельник'} onChange={e => updateLesson(i, 'weekday', e.target.value)}>
+                        {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </td>
                     <td><input className="input" value={row.time} onChange={e => updateLesson(i, 'time', e.target.value)} placeholder="08:00-09:30 или id" /></td>
                     <td><input className="input" value={row.type} onChange={e => updateLesson(i, 'type', e.target.value)} placeholder="лекция" /></td>
                     <td><input className="input" value={row.subject} onChange={e => updateLesson(i, 'subject', e.target.value)} placeholder="Математика" /></td>
@@ -367,6 +267,259 @@ function ManualTab() {
       </div>
     </div>
   );
+}
+
+function GroupsTab() {
+  const { showToast } = useToast();
+  const { confirm } = useConfirmDialog();
+  const [courses, setCourses] = useState([]);
+  const [course, setCourse] = useState('1');
+  const [courseToCreate, setCourseToCreate] = useState('');
+  const [groups, setGroups] = useState([]);
+  const [groupName, setGroupName] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const loadCourses = async () => {
+    const resp = await api.getCatalogCourses();
+    const rows = resp?.ok && Array.isArray(resp.data) ? resp.data : [];
+    const normalized = rows
+      .map(item => parseInt(item.course, 10))
+      .filter(item => !Number.isNaN(item))
+      .sort((a, b) => a - b);
+
+    setCourses(normalized);
+    if (normalized.length && !normalized.includes(parseInt(course, 10))) {
+      setCourse(String(normalized[0]));
+    }
+  };
+
+  const loadGroups = async (courseValue = course) => {
+    const parsedCourse = parseInt(courseValue, 10);
+    if (Number.isNaN(parsedCourse)) {
+      setGroups([]);
+      return;
+    }
+
+    setLoading(true);
+    const resp = await api.getCatalogGroups(parsedCourse);
+    setLoading(false);
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось загрузить группы.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-006',
+      });
+      return;
+    }
+    setGroups(Array.isArray(resp.data) ? resp.data : []);
+  };
+
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  useEffect(() => {
+    loadGroups();
+  }, [course]);
+
+  const createCourse = async () => {
+    const parsed = parseInt(courseToCreate, 10);
+    if (Number.isNaN(parsed)) {
+      showToast({ variant: 'warning', title: 'Введите номер курса.', code: 'UI-SCH-007' });
+      return;
+    }
+
+    const resp = await api.createCatalogCourse(parsed);
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось добавить курс.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-008',
+      });
+      return;
+    }
+
+    setCourseToCreate('');
+    await loadCourses();
+    setCourse(String(parsed));
+    showToast({
+      variant: 'success',
+      title: resp.data?.inserted ? 'Курс добавлен.' : 'Курс уже существует.',
+    });
+  };
+
+  const createGroup = async () => {
+    const parsedCourse = parseInt(course, 10);
+    if (Number.isNaN(parsedCourse)) {
+      showToast({ variant: 'warning', title: 'Выберите курс.', code: 'UI-SCH-009' });
+      return;
+    }
+    if (!groupName.trim()) {
+      showToast({ variant: 'warning', title: 'Введите название группы.', code: 'UI-SCH-010' });
+      return;
+    }
+
+    const resp = await api.createCatalogGroup({
+      course: parsedCourse,
+      group_name: groupName.trim(),
+    });
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось добавить группу.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-011',
+      });
+      return;
+    }
+
+    setGroupName('');
+    await loadGroups(String(parsedCourse));
+    showToast({
+      variant: 'success',
+      title: resp.data?.inserted ? 'Группа добавлена.' : 'Такая группа уже есть в выбранном курсе.',
+    });
+  };
+
+  const saveGroup = async (id) => {
+    if (!editingName.trim()) {
+      showToast({ variant: 'warning', title: 'Введите название группы.', code: 'UI-SCH-012' });
+      return;
+    }
+
+    const resp = await api.updateCatalogGroup(id, {
+      course: parseInt(course, 10),
+      group_name: editingName.trim(),
+    });
+
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось обновить группу.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-013',
+      });
+      return;
+    }
+
+    setEditingId(null);
+    setEditingName('');
+    await loadGroups();
+    showToast({ variant: 'success', title: 'Группа обновлена.' });
+  };
+
+  const deleteGroup = async (id, name) => {
+    const accepted = await confirm({
+      title: 'Удаление группы',
+      message: `Удалить группу ${name}?`,
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
+
+    const resp = await api.deleteCatalogGroup(id);
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось удалить группу.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-014',
+      });
+      return;
+    }
+
+    await loadGroups();
+    showToast({ variant: 'success', title: 'Группа удалена.' });
+  };
+
+  return (
+    <div className="card">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Управление группами</div>
+          <div className="card__subtitle">Создание, редактирование и удаление групп в выбранном курсе</div>
+        </div>
+      </div>
+
+      <div className="card__body" style={{ display: 'grid', gap: 14 }}>
+        <div className="table-wrap" style={{ padding: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Добавить курс</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input" placeholder="Номер курса" value={courseToCreate} onChange={e => setCourseToCreate(e.target.value)} />
+            <button type="button" className="btn" onClick={createCourse}>Добавить курс</button>
+          </div>
+        </div>
+
+        <div className="table-wrap" style={{ padding: 12 }}>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: '2fr 4fr 2fr' }}>
+            <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
+              {!courses.length ? <option value="">Нет курсов</option> : null}
+              {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
+            </select>
+            <input className="input" placeholder="Новая группа" value={groupName} onChange={e => setGroupName(e.target.value)} />
+            <button type="button" className="btn" onClick={createGroup}>Добавить группу</button>
+          </div>
+
+          <div className="table-wrap" style={{ marginTop: 12 }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Курс</th>
+                  <th>Группа</th>
+                  <th style={{ width: 220 }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map(item => (
+                  <tr key={item.id}>
+                    <td>{item.course}</td>
+                    <td>
+                      {editingId === item.id ? (
+                        <input className="input" value={editingName} onChange={e => setEditingName(e.target.value)} />
+                      ) : item.group_name}
+                    </td>
+                    <td>
+                      {editingId === item.id ? (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="button" className="btn btn-sm" onClick={() => saveGroup(item.id)}>Сохранить</button>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingId(null); setEditingName(''); }}>Отмена</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              setEditingId(item.id);
+                              setEditingName(item.group_name || '');
+                            }}
+                          >
+                            Редактировать
+                          </button>
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteGroup(item.id, item.group_name)}>
+                            Удалить
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {!loading && groups.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="table-empty">Для выбранного курса группы пока не добавлены</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function EditTab() {
