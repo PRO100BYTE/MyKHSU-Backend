@@ -97,6 +97,18 @@ const api = {
   },
   updatePair: (id, payload) => request('PUT', `/pairs/${id}`, payload),
   deletePair: (id) => request('DELETE', `/pairs/${id}`),
+  exportSchedule: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    ).toString()
+    return fetch(`${BASE}/schedule/export${qs ? `?${qs}` : ''}`, {
+      headers: (() => {
+        const token = getToken()
+        return token ? { Authorization: `Bearer ${token}` } : {}
+      })(),
+    })
+  },
+  copySchedule: (payload) => request('POST', '/schedule/copy', payload),
   getCatalogCourses: () => request('GET', '/catalog/courses'),
   createCatalogCourse: (course) => request('POST', '/catalog/courses', { course }),
   deleteCatalogCourse: (course) => request('DELETE', `/catalog/courses/${encodeURIComponent(course)}`),
