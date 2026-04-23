@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmDialog } from '../context/ConfirmDialogContext';
 import { formatDateTimeKrasnoyarsk } from '../utils/datetime';
+import { useAnimatedVisibility } from '../hooks/useAnimatedVisibility';
 
 const EMPTY_FORM = {
   username: '',
@@ -59,6 +60,7 @@ export default function UsersScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const modalVisibility = useAnimatedVisibility(isModalOpen);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -308,8 +310,8 @@ export default function UsersScreen() {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
+      {modalVisibility.isRendered && (
+        <div className={`modal-overlay${modalVisibility.isVisible ? ' modal-overlay--open' : ''}`} onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
               <div className="modal__title">{editTarget ? 'Редактирование пользователя' : 'Новый пользователь'}</div>

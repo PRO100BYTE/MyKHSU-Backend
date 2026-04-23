@@ -3,6 +3,7 @@ import api from '../api'
 import { useToast } from '../context/ToastContext'
 import { useConfirmDialog } from '../context/ConfirmDialogContext'
 import { formatDateTimeKrasnoyarsk } from '../utils/datetime'
+import { useAnimatedVisibility } from '../hooks/useAnimatedVisibility'
 
 const STATUSES = [
   { value: '', label: 'Все статусы' },
@@ -52,6 +53,7 @@ export default function UnifiedWindowScreen() {
   const [form, setForm] = useState({ responseText: '' })
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [statusForm, setStatusForm] = useState({ status: 'open', comment: '' })
+  const statusModalVisibility = useAnimatedVisibility(statusModalOpen)
 
   const showRequestError = (fallbackTitle, resp) => {
     showToast({
@@ -288,8 +290,8 @@ export default function UnifiedWindowScreen() {
                   </div>
                 </div>
 
-                {statusModalOpen ? (
-                  <div className="modal-overlay" onClick={() => setStatusModalOpen(false)}>
+                {statusModalVisibility.isRendered ? (
+                  <div className={`modal-overlay${statusModalVisibility.isVisible ? ' modal-overlay--open' : ''}`} onClick={() => setStatusModalOpen(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                       <div className="modal__header">
                         <h3 className="modal__title">Изменение статуса</h3>
