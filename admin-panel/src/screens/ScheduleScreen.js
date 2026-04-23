@@ -93,6 +93,10 @@ function ManualTab() {
   const [cells, setCells] = useState({});
   const [initialCells, setInitialCells] = useState({});
   const [weekDates, setWeekDates] = useState({});
+  const [copyTargetCourse, setCopyTargetCourse] = useState('');
+  const [copyTargetGroup, setCopyTargetGroup] = useState('');
+  const [copyTargetWeekNumber, setCopyTargetWeekNumber] = useState('');
+  const [copyReplaceTarget, setCopyReplaceTarget] = useState(true);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -254,6 +258,13 @@ function ManualTab() {
     loadWeekDates(weekNumber)
   }, [weekNumber, course, group])
 
+  useEffect(() => {
+    setCopyTargetCourse(course)
+    setCopyTargetGroup(group)
+    const parsedWeek = parseInt(weekNumber, 10)
+    setCopyTargetWeekNumber(Number.isNaN(parsedWeek) ? weekNumber : String(parsedWeek + 1))
+  }, [course, group, weekNumber])
+
   const updateCell = (slotId, weekday, field, value) => {
     const key = `${slotId}-${weekday}`
     setCells(prev => ({
@@ -383,6 +394,103 @@ function ManualTab() {
     loadWeekSchedule()
   }
 
+  const exportCurrentSchedule = async () => {
+    const parsedCourse = parseInt(course, 10)
+    const parsedWeek = parseInt(weekNumber, 10)
+    const safeGroup = group.trim()
+
+    if (Number.isNaN(parsedCourse) || Number.isNaN(parsedWeek) || !safeGroup) {
+      showToast({ variant: 'warning', title: 'Для экспорта укажите курс, группу и неделю.', code: 'UI-SCH-017' })
+      return
+    }
+
+    const resp = await api.exportSchedule({
+      course: parsedCourse,
+      group: safeGroup,
+      week_number: parsedWeek,
+    })
+
+    if (!resp.ok) {
+      let errorText = `HTTP ${resp.status}`
+      try {
+        const data = await resp.json()
+        errorText = data?.error || errorText
+      } catch {
+        // ignore parse errors
+      }
+      showToast({ variant: 'error', title: 'Не удалось экспортировать расписание.', description: errorText, code: 'UI-SCH-018' })
+      return
+    }
+
+    const blob = await resp.blob()
+    const contentDisposition = resp.headers.get('Content-Disposition') || ''
+    const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+    const fileName = fileNameMatch?.[1] || `schedule_${safeGroup}_w${parsedWeek}.json`
+
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(objectUrl)
+
+    showToast({ variant: 'success', title: 'Экспорт выполнен.' })
+  }
+
+  const copyScheduleToTarget = async () => {
+    const sourceCourse = parseInt(course, 10)
+    const sourceWeek = parseInt(weekNumber, 10)
+    const sourceGroup = group.trim()
+
+    const targetCourse = parseInt(copyTargetCourse, 10)
+    const targetWeek = parseInt(copyTargetWeekNumber, 10)
+    const targetGroup = copyTargetGroup.trim()
+
+    if (Number.isNaN(sourceCourse) || Number.isNaN(sourceWeek) || !sourceGroup) {
+      showToast({ variant: 'warning', title: 'Некорректные исходные параметры.', code: 'UI-SCH-019' })
+      return
+    }
+    if (Number.isNaN(targetCourse) || Number.isNaN(targetWeek) || !targetGroup) {
+      showToast({ variant: 'warning', title: 'Заполните целевые курс, группу и неделю.', code: 'UI-SCH-020' })
+      return
+    }
+
+    const accepted = await confirm({
+      title: 'Копирование расписания',
+      message: `Скопировать ${sourceGroup} (неделя ${sourceWeek}) в ${targetGroup} (неделя ${targetWeek})?`,
+      confirmText: 'Копировать',
+      danger: copyReplaceTarget,
+    })
+    if (!accepted) return
+
+    const resp = await api.copySchedule({
+      source_course: sourceCourse,
+      source_group: sourceGroup,
+      source_week_number: sourceWeek,
+      target_course: targetCourse,
+      target_group: targetGroup,
+      target_week_number: targetWeek,
+      replace_target: copyReplaceTarget,
+    })
+
+    if (!resp?.ok) {
+      showToast({
+        variant: 'error',
+        title: 'Не удалось скопировать расписание.',
+        description: resp?.error || '',
+        code: resp?.errorCode || 'UI-SCH-021',
+      })
+      return
+    }
+
+    showToast({ variant: 'success', title: `Скопировано пар: ${resp.data?.copied ?? 0}.` })
+    if (targetCourse === sourceCourse && targetGroup === sourceGroup && targetWeek === sourceWeek) {
+      loadWeekSchedule()
+    }
+  }
+
   return (
     <div className="card">
       <div className="card__header">
@@ -498,6 +606,44 @@ function ManualTab() {
             <button className="btn btn-primary" onClick={submitManual} disabled={saving || loadingWeek || !timeSlots.length}>
               {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
+            <button className="btn" onClick={exportCurrentSchedule} disabled={loadingWeek || saving}>
+              Экспорт JSON
+            </button>
+          </div>
+
+          <div className="table-wrap" style={{ marginTop: 12, padding: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Копировать расписание</div>
+            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(3, minmax(140px, 1fr))' }}>
+              <label className="field">
+                <span className="field__label">Курс назначения</span>
+                <select className="select" value={copyTargetCourse} onChange={e => setCopyTargetCourse(e.target.value)}>
+                  {!courses.length ? <option value="">Нет курсов</option> : null}
+                  {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field__label">Группа назначения</span>
+                <input className="input" value={copyTargetGroup} onChange={e => setCopyTargetGroup(e.target.value)} placeholder="Например: ИТ-21" />
+              </label>
+              <label className="field">
+                <span className="field__label">Неделя назначения</span>
+                <input className="input" value={copyTargetWeekNumber} onChange={e => setCopyTargetWeekNumber(e.target.value)} placeholder="Например: 16" />
+              </label>
+            </div>
+
+            <label className="field" style={{ marginTop: 8 }}>
+              <span className="field__label">Режим вставки</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={copyReplaceTarget} onChange={e => setCopyReplaceTarget(e.target.checked)} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Заменить существующие пары в целевой неделе/группе</span>
+              </label>
+            </label>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn" onClick={copyScheduleToTarget} disabled={saving || loadingWeek}>
+                Копировать расписание
+              </button>
+            </div>
           </div>
         </div>
       </div>
