@@ -105,6 +105,7 @@
 | `due_at` | TEXT | SLA-дедлайн |
 | `first_response_at` | TEXT | Время первого ответа агента |
 | `resolved_at` | TEXT | Время решения |
+| `user_hidden_at` | TEXT | Время скрытия обращения пользователем из своей истории (soft-delete только для user-view) |
 | `user_last_read_at` | TEXT | Время, когда пользователь в последний раз открыл переписку |
 | `agent_last_read_at` | TEXT | Время, когда агент в последний раз открыл переписку |
 | `created_at` | TEXT NOT NULL | Дата создания |
@@ -112,7 +113,7 @@
 
 Индексы: `status`, `priority`, `access_token`, `contact_email_hash`.
 
-Для старых БД колонка `contact_email_hash` и индекс на ней добавляются миграцией при старте сервера.
+Для старых БД колонка `contact_email_hash`, колонка `user_hidden_at` и индекс на `contact_email_hash` добавляются миграцией при старте сервера.
 
 ---
 

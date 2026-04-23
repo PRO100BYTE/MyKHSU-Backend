@@ -537,7 +537,7 @@ router.get('/unified-window/tickets/:token', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
-  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
 
   usersDb.prepare('UPDATE unified_window_tickets SET user_last_read_at = ? WHERE id = ?').run(uwNowSql(), ticket.id)
@@ -588,6 +588,7 @@ router.get('/unified-window/tickets', (req, res) => {
        ) AS last_message_at
      FROM unified_window_tickets t
      WHERE t.contact_email_hash = ?
+       AND t.user_hidden_at IS NULL
      ORDER BY t.created_at DESC
      LIMIT 50`
   ).all(emailHash(safeContactEmail))
@@ -620,7 +621,7 @@ router.get('/unified-window/tickets/:token/messages', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
-  const ticket = usersDb.prepare('SELECT id FROM unified_window_tickets WHERE access_token = ?').get(token)
+  const ticket = usersDb.prepare('SELECT id FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
 
   usersDb.prepare('UPDATE unified_window_tickets SET user_last_read_at = ? WHERE id = ?').run(uwNowSql(), ticket.id)
@@ -643,7 +644,7 @@ router.post('/unified-window/tickets/:token/reply', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
-  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
   if (ticket.status === 'closed') return res.status(400).json({ error: 'Ticket is closed' })
 
@@ -675,7 +676,7 @@ router.post('/unified-window/tickets/:token/close', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
-  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
+  const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
   if (ticket.status === 'closed') return res.status(400).json({ error: 'Ticket is already closed' })
 
@@ -723,10 +724,10 @@ router.delete('/unified-window/tickets/:token', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
-  const ticket = usersDb.prepare('SELECT id, status FROM unified_window_tickets WHERE access_token = ?').get(token)
+  const ticket = usersDb.prepare('SELECT id, status FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
   if (ticket.status !== 'closed') return res.status(400).json({ error: 'Only closed ticket can be deleted' })
 
-  usersDb.prepare('DELETE FROM unified_window_tickets WHERE id = ?').run(ticket.id)
+  usersDb.prepare('UPDATE unified_window_tickets SET user_hidden_at = ?, updated_at = ? WHERE id = ?').run(uwNowSql(), uwNowSql(), ticket.id)
   res.json({ ok: true })
 })
