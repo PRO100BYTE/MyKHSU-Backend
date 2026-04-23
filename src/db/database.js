@@ -118,6 +118,7 @@ function initUsersSchema(db) {
 
     CREATE TABLE IF NOT EXISTS unified_window_tickets (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      requester_role   TEXT    NOT NULL DEFAULT 'visitor',
       subject          TEXT    NOT NULL,
       contact_email    TEXT,
       contact_name     TEXT,
@@ -137,6 +138,8 @@ function initUsersSchema(db) {
       due_at           TEXT,
       first_response_at TEXT,
       resolved_at      TEXT,
+      user_last_read_at TEXT,
+      agent_last_read_at TEXT,
       created_at       TEXT    NOT NULL,
       updated_at       TEXT    NOT NULL
     );
@@ -243,6 +246,15 @@ function initUsersSchema(db) {
   }
   if (!uwColumns.includes('contact_email_hash')) {
     db.exec('ALTER TABLE unified_window_tickets ADD COLUMN contact_email_hash TEXT');
+  }
+  if (!uwColumns.includes('requester_role')) {
+    db.exec("ALTER TABLE unified_window_tickets ADD COLUMN requester_role TEXT NOT NULL DEFAULT 'visitor'");
+  }
+  if (!uwColumns.includes('user_last_read_at')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN user_last_read_at TEXT');
+  }
+  if (!uwColumns.includes('agent_last_read_at')) {
+    db.exec('ALTER TABLE unified_window_tickets ADD COLUMN agent_last_read_at TEXT');
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash)');
 

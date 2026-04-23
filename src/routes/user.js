@@ -423,7 +423,7 @@ function decryptTicketField(row, field) {
 
 // POST /api/unified-window/tickets — создать обращение
 router.post('/unified-window/tickets', (req, res) => {
-  const { subject, contact_email, contact_name, message, priority } = req.body ?? {}
+  const { role, subject, contact_email, contact_name, message, priority } = req.body ?? {}
 
   if (!subject || !String(subject).trim()) {
     return res.status(400).json({ error: 'subject is required' })
@@ -433,9 +433,14 @@ router.post('/unified-window/tickets', (req, res) => {
   }
 
   const validPriorities = ['low', 'normal', 'high', 'urgent']
+  const validRoles = ['visitor', 'student', 'teacher']
+  const safeRole = validRoles.includes(role) ? role : 'visitor'
   const safePriority = validPriorities.includes(priority) ? priority : 'normal'
   const safeSubject = String(subject).trim()
   const safeContactEmail = normalizeEmail(contact_email)
+  if (!safeContactEmail) {
+    return res.status(400).json({ error: 'contact_email is required' })
+  }
   const safeContactName = normalizeNullableText(contact_name, 160)
   const accessToken = createAccessToken()
   const now = uwNowSql()
@@ -447,6 +452,7 @@ router.post('/unified-window/tickets', (req, res) => {
 
   const ticketResult = usersDb.prepare(
     `INSERT INTO unified_window_tickets (
+      requester_role,
       subject,
       contact_email,
       contact_name,
@@ -464,11 +470,14 @@ router.post('/unified-window/tickets', (req, res) => {
       priority,
       access_token,
       due_at,
+      user_last_read_at,
+      agent_last_read_at,
       created_at,
       updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)`
   ).run(
+    safeRole,
     safeSubject,
     safeContactEmail,
     safeContactName,
@@ -485,6 +494,8 @@ router.post('/unified-window/tickets', (req, res) => {
     safePriority,
     accessToken,
     dueAt,
+    now,
+    null,
     now,
     now,
   )
@@ -518,6 +529,8 @@ router.get('/unified-window/tickets/:token', (req, res) => {
   const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE access_token = ?').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
 
+  usersDb.prepare('UPDATE unified_window_tickets SET user_last_read_at = ? WHERE id = ?').run(uwNowSql(), ticket.id)
+
   const subjectText = decryptTicketField(ticket, 'subject')
   const contactNameText = decryptTicketField(ticket, 'contact_name')
 
@@ -527,10 +540,12 @@ router.get('/unified-window/tickets/:token', (req, res) => {
 
   res.json({
     id: ticket.id,
+    requester_role: ticket.requester_role ?? 'visitor',
     subject: subjectText,
     status: ticket.status,
     priority: ticket.priority,
     contact_name: contactNameText,
+    contact_email: decryptTicketField(ticket, 'contact_email'),
     due_at: ticket.due_at,
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
@@ -544,19 +559,44 @@ router.get('/unified-window/tickets', (req, res) => {
   if (!safeContactEmail) return res.status(400).json({ error: 'contact_email is required' })
 
   const rows = usersDb.prepare(
-    `SELECT * FROM unified_window_tickets
-     WHERE contact_email_hash = ?
-     ORDER BY created_at DESC
+    `SELECT
+       t.*,
+       (
+         SELECT m.author_role
+         FROM unified_window_messages m
+         WHERE m.ticket_id = t.id
+         ORDER BY m.created_at DESC, m.id DESC
+         LIMIT 1
+       ) AS last_message_author_role,
+       (
+         SELECT m.created_at
+         FROM unified_window_messages m
+         WHERE m.ticket_id = t.id
+         ORDER BY m.created_at DESC, m.id DESC
+         LIMIT 1
+       ) AS last_message_at
+     FROM unified_window_tickets t
+     WHERE t.contact_email_hash = ?
+     ORDER BY t.created_at DESC
      LIMIT 50`
   ).all(emailHash(safeContactEmail))
 
   const tickets = rows.map(ticket => ({
     id: ticket.id,
     access_token: ticket.access_token,
+    requester_role: ticket.requester_role ?? 'visitor',
     subject: decryptTicketField(ticket, 'subject'),
     status: ticket.status,
     priority: ticket.priority,
     contact_name: decryptTicketField(ticket, 'contact_name'),
+    contact_email: decryptTicketField(ticket, 'contact_email'),
+    last_message_author_role: ticket.last_message_author_role ?? null,
+    last_message_at: ticket.last_message_at ?? null,
+    has_unread_for_user: Boolean(
+      ticket.last_message_author_role === 'agent' &&
+      ticket.last_message_at &&
+      (!ticket.user_last_read_at || ticket.last_message_at > ticket.user_last_read_at)
+    ),
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
   }))
@@ -571,6 +611,8 @@ router.get('/unified-window/tickets/:token/messages', (req, res) => {
 
   const ticket = usersDb.prepare('SELECT id FROM unified_window_tickets WHERE access_token = ?').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+
+  usersDb.prepare('UPDATE unified_window_tickets SET user_last_read_at = ? WHERE id = ?').run(uwNowSql(), ticket.id)
 
   const messages = usersDb.prepare(
     'SELECT id, author_role, author_name, encrypted_text_iv, encrypted_text_tag, encrypted_text_data, created_at FROM unified_window_messages WHERE ticket_id = ? ORDER BY created_at'
@@ -607,9 +649,11 @@ router.post('/unified-window/tickets/:token/reply', (req, res) => {
      VALUES (?, 'user', ?, ?, ?, ?, ?)`
   ).run(ticket.id, safeContactName ?? fallbackContactName ?? null, encrypted.iv, encrypted.tag, encrypted.data, now)
 
-  // Переоткрыть тикет если был resolved
+  // Переоткрыть тикет если был resolved, а также обновить время активности
   if (ticket.status === 'resolved') {
     usersDb.prepare("UPDATE unified_window_tickets SET status = 'open', updated_at = ? WHERE id = ?").run(now, ticket.id)
+  } else {
+    usersDb.prepare('UPDATE unified_window_tickets SET updated_at = ? WHERE id = ?').run(now, ticket.id)
   }
 
   res.json({ ok: true, id: result.lastInsertRowid })
@@ -660,5 +704,18 @@ router.post('/unified-window/tickets/:token/close', (req, res) => {
     }).catch(() => {})
   }
 
+  res.json({ ok: true })
+})
+
+// DELETE /api/unified-window/tickets/:token — удалить закрытое обращение пользователем
+router.delete('/unified-window/tickets/:token', (req, res) => {
+  const { token } = req.params
+  if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
+
+  const ticket = usersDb.prepare('SELECT id, status FROM unified_window_tickets WHERE access_token = ?').get(token)
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+  if (ticket.status !== 'closed') return res.status(400).json({ error: 'Only closed ticket can be deleted' })
+
+  usersDb.prepare('DELETE FROM unified_window_tickets WHERE id = ?').run(ticket.id)
   res.json({ ok: true })
 })

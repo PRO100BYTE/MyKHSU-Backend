@@ -17,6 +17,17 @@ const STATUS_LABELS = {
   closed: 'Закрыто',
 }
 
+const ROLE_LABELS = {
+  visitor: 'Посетитель',
+  student: 'Студент',
+  teacher: 'Преподаватель',
+}
+
+const LAST_AUTHOR_LABELS = {
+  user: 'Пользователь',
+  agent: 'Администрация',
+}
+
 function formatDate(value) {
   if (!value) return 'Неизвестно'
   const date = new Date(value)
@@ -38,7 +49,9 @@ export default function UnifiedWindowScreen() {
   const [selected, setSelected] = useState(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ status: 'open', responseText: '', comment: '' })
+  const [form, setForm] = useState({ responseText: '' })
+  const [statusModalOpen, setStatusModalOpen] = useState(false)
+  const [statusForm, setStatusForm] = useState({ status: 'open', comment: '' })
 
   const showRequestError = (fallbackTitle, resp) => {
     showToast({
@@ -83,10 +96,13 @@ export default function UnifiedWindowScreen() {
 
     setSelected(resp.data)
     setForm({
-      status: resp.data?.status || 'open',
       responseText: '',
+    })
+    setStatusForm({
+      status: resp.data?.status || 'open',
       comment: '',
     })
+    fetchTickets()
   }
 
   const counts = useMemo(() => {
@@ -96,13 +112,26 @@ export default function UnifiedWindowScreen() {
     }, {})
   }, [tickets])
 
-  const saveTicket = async () => {
+  const refreshSelected = async (ticketId) => {
+    const detailResp = await api.getUwTicket(ticketId)
+    if (!detailResp?.ok) {
+      showRequestError('Не удалось перечитать состояние обращения.', detailResp)
+      return false
+    }
+
+    setSelected(detailResp.data)
+    setSelectedId(detailResp.data?.id ?? ticketId)
+    setStatusForm({ status: detailResp.data?.status || 'open', comment: '' })
+    return true
+  }
+
+  const sendMessage = async () => {
     if (!selected) return
 
-    if (!form.responseText.trim() && form.status === selected.status && !form.comment.trim()) {
+    if (!form.responseText.trim()) {
       showToast({
         variant: 'warning',
-        title: 'Нет изменений для сохранения.',
+        title: 'Введите текст сообщения перед отправкой.',
         code: 'UI-UW-002',
       })
       return
@@ -110,39 +139,65 @@ export default function UnifiedWindowScreen() {
 
     setSaving(true)
 
-    if (form.responseText.trim()) {
-      const messageResp = await api.postUwMessage(selected.id, form.responseText.trim())
-      if (!messageResp?.ok) {
-        setSaving(false)
-        showRequestError('Не удалось отправить ответ по обращению.', messageResp)
-        return
-      }
-    }
-
-    if (form.status !== selected.status || form.comment.trim()) {
-      const statusResp = await api.patchUwStatus(selected.id, form.status, form.comment.trim() || undefined)
-      if (!statusResp?.ok) {
-        setSaving(false)
-        showRequestError('Не удалось обновить статус обращения.', statusResp)
-        return
-      }
-    }
-
-    const detailResp = await api.getUwTicket(selected.id)
-    setSaving(false)
-
-    if (!detailResp?.ok) {
-      showRequestError('Обращение обновлено, но не удалось перечитать его состояние.', detailResp)
-      setSelected(null)
-      fetchTickets()
+    const messageResp = await api.postUwMessage(selected.id, form.responseText.trim())
+    if (!messageResp?.ok) {
+      setSaving(false)
+      showRequestError('Не удалось отправить ответ по обращению.', messageResp)
       return
     }
 
-    setSelected(detailResp.data)
-    setSelectedId(detailResp.data?.id ?? selected.id)
-    setForm(current => ({ ...current, responseText: '', comment: '' }))
+    const refreshed = await refreshSelected(selected.id)
+    setSaving(false)
+    if (!refreshed) return
+
+    setForm({ responseText: '' })
     fetchTickets()
-    showToast({ variant: 'success', title: 'Обращение успешно обновлено.' })
+    showToast({ variant: 'success', title: 'Ответ отправлен.' })
+  }
+
+  const applyStatusChange = async () => {
+    if (!selected) return
+
+    if (statusForm.status === selected.status && !statusForm.comment.trim()) {
+      showToast({ variant: 'warning', title: 'Нет изменений статуса.' })
+      return
+    }
+
+    setSaving(true)
+    const statusResp = await api.patchUwStatus(selected.id, statusForm.status, statusForm.comment.trim() || undefined)
+    if (!statusResp?.ok) {
+      setSaving(false)
+      showRequestError('Не удалось обновить статус обращения.', statusResp)
+      return
+    }
+
+    const refreshed = await refreshSelected(selected.id)
+    setSaving(false)
+    if (!refreshed) return
+
+    setStatusModalOpen(false)
+    fetchTickets()
+    showToast({ variant: 'success', title: 'Статус обращения обновлен.' })
+  }
+
+  const deleteTicket = async () => {
+    if (!selected) return
+    const confirmed = window.confirm(`Удалить обращение #${selected.id}? Действие необратимо.`)
+    if (!confirmed) return
+
+    setSaving(true)
+    const resp = await api.deleteUwTicket(selected.id)
+    setSaving(false)
+
+    if (!resp?.ok) {
+      showRequestError('Не удалось удалить обращение.', resp)
+      return
+    }
+
+    setSelected(null)
+    setSelectedId(null)
+    fetchTickets()
+    showToast({ variant: 'success', title: 'Обращение удалено.' })
   }
 
   const selectedTicketPreview = tickets.find(ticket => ticket.id === selectedId)
@@ -188,10 +243,15 @@ export default function UnifiedWindowScreen() {
                 >
                   <div className="uw-admin-ticket-card__row">
                     <strong>#{ticket.id}</strong>
-                    <span className="badge badge-gray">{STATUS_LABELS[ticket.status] || ticket.status}</span>
+                    <div className="uw-admin-ticket-card__badges">
+                      {ticket.has_unread_for_agent ? <span className="badge badge-red">Непрочитано</span> : null}
+                      <span className="badge badge-gray">{STATUS_LABELS[ticket.status] || ticket.status}</span>
+                    </div>
                   </div>
                   <div className="uw-admin-ticket-card__subject">{ticket.subject || 'Без темы'}</div>
-                  <div className="uw-admin-ticket-card__meta">{ticket.contact_name || 'Без имени'} • {ticket.contact_email || 'без email'}</div>
+                  <div className="uw-admin-ticket-card__meta">{ticket.contact_name || 'Без имени'} • {ROLE_LABELS[ticket.requester_role] || 'Пользователь'}</div>
+                  <div className="uw-admin-ticket-card__meta">{ticket.contact_email || 'без email'}</div>
+                  <div className="uw-admin-ticket-card__meta">Последнее сообщение: {LAST_AUTHOR_LABELS[ticket.last_message_author_role] || '—'}</div>
                   <div className="uw-admin-ticket-card__meta">{formatDate(ticket.updated_at || ticket.created_at)}</div>
                 </button>
               ))}
@@ -209,29 +269,53 @@ export default function UnifiedWindowScreen() {
                   <div>
                     <h3>Обращение #{selected.id}</h3>
                     <p className="muted">{selected.subject || selectedTicketPreview?.subject || 'Без темы'}</p>
-                    <p className="muted">{selected.contact_name || 'Без имени'} • {selected.contact_email || 'без email'} • {selected.category || 'other'}</p>
+                    <p className="muted">
+                      {selected.contact_name || 'Без имени'} • {selected.contact_email || 'без email'} • {ROLE_LABELS[selected.requester_role] || 'Пользователь'}
+                    </p>
                   </div>
                   <div className="uw-admin-chat__controls">
-                    <label className="field">
-                      <span className="field__label">Статус</span>
-                      <select className="select" value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value }))}>
-                        {STATUSES.slice(1).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span className="field__label">Комментарий к статусу</span>
-                      <input
-                        className="input"
-                        value={form.comment}
-                        onChange={e => setForm(v => ({ ...v, comment: e.target.value }))}
-                        placeholder="Причина изменения статуса"
-                      />
-                    </label>
-                    <button className="btn btn-primary" onClick={saveTicket} disabled={saving}>
-                      {saving ? 'Сохранение...' : 'Сохранить изменения'}
+                    <button className="btn" onClick={() => setStatusModalOpen(true)} disabled={saving}>
+                      Изменить статус
+                    </button>
+                    <button className="btn btn-danger" onClick={deleteTicket} disabled={saving}>
+                      Удалить
                     </button>
                   </div>
                 </div>
+
+                {statusModalOpen ? (
+                  <div className="modal-overlay" onClick={() => setStatusModalOpen(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                      <div className="modal__header">
+                        <h3 className="modal__title">Изменение статуса</h3>
+                      </div>
+                      <div className="modal__body">
+                        <label className="field">
+                          <span className="field__label">Статус</span>
+                          <select className="select" value={statusForm.status} onChange={e => setStatusForm(v => ({ ...v, status: e.target.value }))}>
+                            {STATUSES.slice(1).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span className="field__label">Комментарий к смене статуса</span>
+                          <textarea
+                            className="input"
+                            rows={3}
+                            value={statusForm.comment}
+                            onChange={e => setStatusForm(v => ({ ...v, comment: e.target.value }))}
+                            placeholder="Причина изменения статуса"
+                          />
+                        </label>
+                      </div>
+                      <div className="modal__footer">
+                        <button className="btn" onClick={() => setStatusModalOpen(false)}>Отмена</button>
+                        <button className="btn btn-primary" onClick={applyStatusChange} disabled={saving}>
+                          {saving ? 'Сохранение...' : 'Сохранить'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="uw-admin-chat__messages">
                   {Array.isArray(selected.messages) && selected.messages.length ? selected.messages.map(message => (
@@ -258,9 +342,20 @@ export default function UnifiedWindowScreen() {
                       rows={3}
                       value={form.responseText}
                       onChange={e => setForm(v => ({ ...v, responseText: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
                       placeholder="Введите ответ пользователю"
                     />
                   </label>
+                  <div className="uw-admin-chat__composer-actions">
+                    <button className="btn btn-primary" onClick={sendMessage} disabled={saving || !form.responseText.trim()}>
+                      {saving ? 'Отправка...' : 'Отправить сообщение'}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (

@@ -1534,6 +1534,12 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   gap: 8px;
 }
 
+.uw-admin-ticket-card__badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .uw-admin-ticket-card__subject {
   font-weight: 600;
   line-height: 1.35;
@@ -1633,6 +1639,12 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
 
 .uw-admin-chat__composer .field {
   margin: 0;
+}
+
+.uw-admin-chat__composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 @media (max-width: 1100px) {

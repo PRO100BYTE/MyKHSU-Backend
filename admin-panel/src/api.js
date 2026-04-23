@@ -81,6 +81,7 @@ const api = {
   // Сервисная информация
   getMeta: () =>
     fetch('/api/meta').then(r => r.json()),
+  getDashboardSummary: () => request('GET', '/dashboard/summary'),
 
   // Расписание
   deletePairsTable: () => request('DELETE', '/deletetable'),
@@ -130,6 +131,7 @@ const api = {
   getUwTicket: (id) => request('GET', `/unified-window/tickets/${id}`),
   postUwMessage: (ticketId, text) => request('POST', `/unified-window/tickets/${ticketId}/messages`, { text }),
   patchUwStatus: (ticketId, status, comment) => request('PATCH', `/unified-window/tickets/${ticketId}/status`, { status, comment }),
+  deleteUwTicket: (ticketId) => request('DELETE', `/unified-window/tickets/${ticketId}`),
   uploadUwAttachment: (ticketId, file, messageId) => {
     const form = new FormData()
     form.append('file', file)

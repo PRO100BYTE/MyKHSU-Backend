@@ -67,8 +67,17 @@ function mapTicket(row) {
   const subject = decryptTicketField(row, 'subject')
   const contactEmail = decryptTicketField(row, 'contact_email')
   const contactName = decryptTicketField(row, 'contact_name')
+  const lastMessageAuthorRole = row.last_message_author_role ?? null
+  const lastMessageAt = row.last_message_at ?? null
+  const hasUnreadForAgent = Boolean(
+    lastMessageAuthorRole === 'user' &&
+    lastMessageAt &&
+    (!row.agent_last_read_at || lastMessageAt > row.agent_last_read_at)
+  )
+
   return {
     id: row.id,
+    requester_role: row.requester_role ?? 'visitor',
     subject,
     contact_email: contactEmail,
     contact_name: contactName,
@@ -78,6 +87,11 @@ function mapTicket(row) {
     due_at: row.due_at,
     first_response_at: row.first_response_at,
     resolved_at: row.resolved_at,
+    user_last_read_at: row.user_last_read_at ?? null,
+    agent_last_read_at: row.agent_last_read_at ?? null,
+    last_message_author_role: lastMessageAuthorRole,
+    last_message_at: lastMessageAt,
+    has_unread_for_agent: hasUnreadForAgent,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -867,31 +881,39 @@ router.get('/unified-window/tickets', requireAuth, requirePermission('unified_wi
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
   const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0)
 
-  let sql = 'SELECT * FROM unified_window_tickets WHERE 1=1'
+  let sql = `
+    SELECT
+      t.*,
+      (
+        SELECT m.author_role
+        FROM unified_window_messages m
+        WHERE m.ticket_id = t.id
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      ) AS last_message_author_role,
+      (
+        SELECT m.created_at
+        FROM unified_window_messages m
+        WHERE m.ticket_id = t.id
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      ) AS last_message_at
+    FROM unified_window_tickets t
+    WHERE 1=1
+  `
   const params = []
 
   if (status && ['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
-    sql += ' AND status = ?'
+    sql += ' AND t.status = ?'
     params.push(status)
   }
 
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  sql += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?'
   params.push(limit, offset)
 
   const rows = usersDb.prepare(sql).all(...params)
 
-  // Расшифровываем поля
-  const tickets = rows.map(t => ({
-    id: t.id,
-    subject: decryptTicketField(t, 'subject'),
-    status: t.status,
-    priority: t.priority,
-    contact_name: decryptTicketField(t, 'contact_name'),
-    contact_email: decryptTicketField(t, 'contact_email'),
-    access_token: t.access_token,
-    created_at: t.created_at,
-    updated_at: t.updated_at,
-  }))
+  const tickets = rows.map(mapTicket)
 
   res.json(tickets)
 })
@@ -905,6 +927,10 @@ router.get('/unified-window/tickets/:id', requireAuth, requirePermission('unifie
 
   const ticket = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE id = ?').get(id)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
+
+  const readAt = nowSql()
+  usersDb.prepare('UPDATE unified_window_tickets SET agent_last_read_at = ? WHERE id = ?').run(readAt, id)
+  const ticketAfterRead = usersDb.prepare('SELECT * FROM unified_window_tickets WHERE id = ?').get(id)
 
   const messagesRaw = usersDb.prepare(
     'SELECT * FROM unified_window_messages WHERE ticket_id = ? ORDER BY created_at ASC'
@@ -928,7 +954,7 @@ router.get('/unified-window/tickets/:id', requireAuth, requirePermission('unifie
     'SELECT * FROM unified_window_status_history WHERE ticket_id = ? ORDER BY created_at ASC'
   ).all(id)
 
-  res.json({ ...mapTicket(ticket), messages, files, history })
+  res.json({ ...mapTicket(ticketAfterRead), messages, files, history })
 })
 
 // POST /adminapi/unified-window/tickets/:id/messages — ответ агента
@@ -950,11 +976,11 @@ router.post('/unified-window/tickets/:id/messages', requireAuth, requirePermissi
      VALUES (?, 'agent', ?, ?, ?, ?, ?)`
   ).run(id, buildAgentDisplayName(req.user), encrypted.iv, encrypted.tag, encrypted.data, now)
 
-  // Записать время первого ответа агента если ещё не установлено
-  if (!ticket.first_response_at) {
-    usersDb.prepare('UPDATE unified_window_tickets SET first_response_at = ?, updated_at = ? WHERE id = ?')
-      .run(now, now, id)
-  }
+  usersDb.prepare(
+    `UPDATE unified_window_tickets
+     SET updated_at = ?, first_response_at = COALESCE(first_response_at, ?)
+     WHERE id = ?`
+  ).run(now, now, id)
 
   const ticketEmail = decryptTicketField(ticket, 'contact_email')
   const ticketSubject = decryptTicketField(ticket, 'subject')
@@ -1062,6 +1088,18 @@ router.patch('/unified-window/tickets/:id/status', requireAuth, requirePermissio
     }).catch(() => {})
   }
 
+  res.json({ ok: true })
+})
+
+// DELETE /adminapi/unified-window/tickets/:id — удалить обращение полностью
+router.delete('/unified-window/tickets/:id', requireAuth, requirePermission('unified_window:write'), (req, res) => {
+  const id = parseInt(req.params.id, 10)
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ticket id' })
+
+  const exists = usersDb.prepare('SELECT id FROM unified_window_tickets WHERE id = ?').get(id)
+  if (!exists) return res.status(404).json({ error: 'Ticket not found' })
+
+  usersDb.prepare('DELETE FROM unified_window_tickets WHERE id = ?').run(id)
   res.json({ ok: true })
 })
 
