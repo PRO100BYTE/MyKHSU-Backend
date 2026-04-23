@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pairsDb, usersDb } from '../db/database.js';
-import { getWeekDates, getCurrentWeekNumber, normalizeDate } from '../utils/dates.js';
+import { getWeekDates, getCurrentWeekNumber, normalizeDate, weekdayFromDate } from '../utils/dates.js';
 import { APP_CONSTANTS } from '../constants.js';
 import { BUILD_INFO } from '../build-info.generated.js';
 import { encryptText, decryptText, createAccessToken } from '../utils/uw-crypto.js';
@@ -55,13 +55,31 @@ router.get('/getpairs', (req, res) => {
   const col = colMap[type];
   if (!col) return res.status(400).json({ error: `Unknown type: ${type}` });
 
-  const rows = pairsDb.prepare(
+  let rows = pairsDb.prepare(
     `SELECT p.*, t.time_start, t.time_end
      FROM pairs p
      LEFT JOIN times t ON p.time = t.id
      WHERE p.${col} = ? AND p.date = ?
      ORDER BY p.time`
   ).all(target, normalDate);
+
+  // Fallback для недельных данных без явного p.date:
+  // используем диапазон недели (date_start/date_end) + weekday запрошенной даты.
+  if (!rows.length) {
+    const weekday = weekdayFromDate(normalDate)
+    rows = pairsDb.prepare(
+      `SELECT p.*, t.time_start, t.time_end
+       FROM pairs p
+       LEFT JOIN times t ON p.time = t.id
+       WHERE p.${col} = ?
+         AND (p.date IS NULL OR TRIM(p.date) = '')
+         AND p.weekday = ?
+         AND p.date_start IS NOT NULL
+         AND p.date_end IS NOT NULL
+         AND ? BETWEEN p.date_start AND p.date_end
+       ORDER BY p.time`
+    ).all(target, weekday, normalDate)
+  }
 
   res.json(mapLessons(rows));
 });
@@ -719,14 +737,16 @@ router.post('/unified-window/tickets/:token/close', (req, res) => {
   res.json({ ok: true })
 })
 
-// DELETE /api/unified-window/tickets/:token — удалить закрытое обращение пользователем
+// DELETE /api/unified-window/tickets/:token — скрыть закрытое/решенное обращение пользователем
 router.delete('/unified-window/tickets/:token', (req, res) => {
   const { token } = req.params
   if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid token' })
 
   const ticket = usersDb.prepare('SELECT id, status FROM unified_window_tickets WHERE access_token = ? AND user_hidden_at IS NULL').get(token)
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' })
-  if (ticket.status !== 'closed') return res.status(400).json({ error: 'Only closed ticket can be deleted' })
+  if (ticket.status !== 'closed' && ticket.status !== 'resolved') {
+    return res.status(400).json({ error: 'Only closed or resolved ticket can be deleted' })
+  }
 
   usersDb.prepare('UPDATE unified_window_tickets SET user_hidden_at = ?, updated_at = ? WHERE id = ?').run(uwNowSql(), uwNowSql(), ticket.id)
   res.json({ ok: true })

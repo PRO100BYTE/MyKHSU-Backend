@@ -6,7 +6,7 @@ import { pairsDb, usersDb } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { config } from '../config.js';
 import { importTimetable } from '../parsers/timetable.js';
-import { normalizeDate } from '../utils/dates.js';
+import { getWeekDates, normalizeDate } from '../utils/dates.js';
 import { hasPermission, USER_ROLES } from '../utils/permissions.js';
 import { encryptText, decryptText, encryptBuffer, decryptBuffer } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
@@ -400,6 +400,15 @@ function resolveTimeId(rawTime) {
     .prepare('INSERT INTO times (time, time_start, time_end) VALUES (?, ?, ?)')
     .run(nextTime, range.time_start, range.time_end)
   return Number(inserted.lastInsertRowid)
+}
+
+function addDaysToIsoDate(isoDate, days) {
+  if (!isoDate) return null
+  const [year, month, day] = String(isoDate).split('-').map(Number)
+  if (!year || !month || !day) return null
+  const utc = new Date(Date.UTC(year, month - 1, day))
+  utc.setUTCDate(utc.getUTCDate() + days)
+  return utc.toISOString().slice(0, 10)
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,12 +1043,15 @@ router.post('/updatepairs', requireAuth, requirePermission('schedule:write'), (r
   }
 
   const normalizedCourse = Number.isNaN(parseInt(course, 10)) ? null : parseInt(course, 10)
+  const normalizedWeekNumber = Number.isNaN(parseInt(week_number, 10)) ? null : parseInt(week_number, 10)
   const normalizedWeekday = normalizeWeekday(weekday)
   if (weekday !== undefined && weekday !== null && weekday !== '' && normalizedWeekday === null) {
     return res.status(400).json({ error: 'weekday must be 1..7 or weekday name' })
   }
 
   const normalDate = normalizeDate(date ?? '') || null;
+  const weekDates = normalizedWeekNumber ? getWeekDates(normalizedWeekNumber) : null
+  const derivedDate = normalDate || (weekDates?.dateStart && normalizedWeekday ? addDaysToIsoDate(weekDates.dateStart, normalizedWeekday - 1) : null)
   const insert = pairsDb.prepare(
     `INSERT INTO pairs (week_number, weekday, course, group_name, date, time, type, subject, teacher, auditory, date_start, date_end)
      VALUES (@week_number, @weekday, @course, @group_name, @date, @time, @type, @subject, @teacher, @auditory, @date_start, @date_end)`
@@ -1061,15 +1073,16 @@ router.post('/updatepairs', requireAuth, requirePermission('schedule:write'), (r
       switch (lesson.method) {
         case 'create':
           insert.run({
-            week_number: week_number ?? null,
+            week_number: normalizedWeekNumber,
             weekday: normalizedWeekday,
             course: normalizedCourse,
             group_name: String(group).trim(),
-            date: normalDate,
+            date: derivedDate,
             time: timeId,
             type: lesson.type ?? null, subject: lesson.subject ?? null,
             teacher: lesson.teacher ?? null, auditory: lesson.auditory ?? null,
-            date_start: null, date_end: null,
+            date_start: weekDates?.dateStart ?? null,
+            date_end: weekDates?.dateEnd ?? null,
           });
           break;
         case 'update':
@@ -1374,6 +1387,10 @@ router.patch('/unified-window/tickets/:id/status', requireAuth, requirePermissio
 
   if (status === 'resolved' && !ticket.resolved_at) {
     updates.resolved_at = now
+  }
+
+  if (['resolved', 'closed'].includes(ticket.status) && ['open', 'in_progress'].includes(status)) {
+    updates.user_hidden_at = null
   }
 
   const setClauses = Object.keys(updates).map(k => `${k} = @${k}`).join(', ')

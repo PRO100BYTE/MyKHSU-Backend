@@ -16,6 +16,13 @@ const EMPTY_LESSON = {
 
 const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5, 6]
 
+function formatIsoDateForHeader(isoDate) {
+  if (!isoDate) return ''
+  const date = new Date(`${isoDate}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+}
+
 function emptyPlannerCell() {
   return { id: null, type: '', subject: '', teacher: '', auditory: '' }
 }
@@ -85,8 +92,29 @@ function ManualTab() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [cells, setCells] = useState({});
   const [initialCells, setInitialCells] = useState({});
+  const [weekDates, setWeekDates] = useState({});
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const loadWeekDates = async (value = weekNumber) => {
+    const parsedWeek = parseInt(value, 10)
+    if (Number.isNaN(parsedWeek)) {
+      setWeekDates({})
+      return
+    }
+
+    const resp = await api.getDates(parsedWeek)
+    if (!Array.isArray(resp)) {
+      setWeekDates({})
+      return
+    }
+
+    const mapping = {}
+    WEEKDAY_NUMBERS.forEach((day, idx) => {
+      mapping[day] = formatIsoDateForHeader(resp[idx])
+    })
+    setWeekDates(mapping)
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -216,6 +244,10 @@ function ManualTab() {
   useEffect(() => {
     loadWeekSchedule()
   }, [course, group, weekNumber])
+
+  useEffect(() => {
+    loadWeekDates(weekNumber)
+  }, [weekNumber])
 
   const updateCell = (slotId, weekday, field, value) => {
     const key = `${slotId}-${weekday}`
@@ -387,8 +419,15 @@ function ManualTab() {
               <thead>
                 <tr>
                   <th style={{ minWidth: 160 }}>Время</th>
-                  {WEEKDAYS.map(day => (
-                    <th key={day} style={{ minWidth: 220 }}>{day}</th>
+                  {WEEKDAYS.map((day, index) => (
+                    <th key={day} style={{ minWidth: 220 }}>
+                      <div style={{ display: 'grid', gap: 2 }}>
+                        <span>{day}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                          {weekDates[WEEKDAY_NUMBERS[index]] || ''}
+                        </span>
+                      </div>
+                    </th>
                   ))}
                 </tr>
               </thead>

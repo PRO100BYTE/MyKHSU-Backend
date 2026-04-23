@@ -150,6 +150,8 @@ const api = {
     fetch('/api/getcourses').then(r => r.json()),
   getWeekNumbers: () =>
     fetch('/api/weeknumbers').then(r => r.json()),
+  getDates: (week) =>
+    fetch(`/api/getdates?week=${encodeURIComponent(week)}`).then(r => r.json()),
   getPairsTime: () =>
     fetch('/api/getpairstime?include_id=true').then(r => r.json()),
   getNews: (amount = 20, from = 0) =>
