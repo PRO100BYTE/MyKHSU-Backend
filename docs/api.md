@@ -682,6 +682,111 @@
 
 ---
 
+### GET `/adminapi/login-history`
+
+История входов всех пользователей (только для администраторов с правом `users:read`).
+
+**Query-параметры:**
+
+| Параметр | Тип | По умолчанию | Описание |
+| --- | --- | --- | --- |
+| `limit` | number | 100 | Количество записей (максимум 500) |
+| `offset` | number | 0 | Смещение для пагинации |
+| `userId` | number | — | Фильтр по ID пользователя (опционально) |
+
+**Response 200:**
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "username": "admin",
+      "first_name": "Иван",
+      "last_name": "Иванов",
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0...",
+      "device_model": null,
+      "device_os": "Windows",
+      "device_os_version": "10",
+      "browser_name": "Chrome",
+      "browser_version": "120.0.0.0",
+      "login_timestamp": "2026-04-23 15:30:45",
+      "created_at": "2026-04-23 15:30:45"
+    }
+  ],
+  "pagination": {
+    "total": 42,
+    "limit": 100,
+    "offset": 0,
+    "pages": 1
+  }
+}
+```
+
+---
+
+### GET `/adminapi/users/{id}/login-history`
+
+История входов конкретного пользователя. Пользователь может видеть свою историю, администратор может видеть историю любого пользователя.
+
+**Query-параметры:**
+
+| Параметр | Тип | По умолчанию | Описание |
+| --- | --- | --- | --- |
+| `limit` | number | 50 | Количество записей (максимум 200) |
+| `offset` | number | 0 | Смещение для пагинации |
+
+**Response 200:**
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0...",
+      "device_model": "MacBook Pro",
+      "device_os": "macOS",
+      "device_os_version": "14.3",
+      "browser_name": "Safari",
+      "browser_version": "17.3",
+      "login_timestamp": "2026-04-23 15:30:45",
+      "created_at": "2026-04-23 15:30:45"
+    }
+  ],
+  "pagination": {
+    "total": 25,
+    "limit": 50,
+    "offset": 0,
+    "pages": 1
+  }
+}
+```
+
+---
+
+### GET `/adminapi/users/{id}/login-stats`
+
+Статистика входов пользователя.
+
+**Response 200:**
+
+```json
+{
+  "total_logins": 127,
+  "unique_days": 45,
+  "unique_ips": 3,
+  "last_login": "2026-04-23 15:30:45",
+  "os_list": "Windows,macOS,Linux",
+  "browser_list": "Chrome,Safari,Firefox"
+}
+```
+
+---
+
 ### GET `/adminapi/catalog/courses`
 
 Список курсов ручного каталога.
