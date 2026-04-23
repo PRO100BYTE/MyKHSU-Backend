@@ -175,10 +175,15 @@
   {
     "id": 12,
     "access_token": "a1b2c3d4...",
+    "requester_role": "student",
     "subject": "Проблема с расписанием",
     "status": "open",
     "priority": "normal",
     "contact_name": "Иван Иванов",
+    "contact_email": "ivan@example.com",
+    "last_message_author_role": "agent",
+    "last_message_at": "2026-04-22 11:20:00",
+    "has_unread_for_user": true,
     "created_at": "2026-04-22 10:00:00",
     "updated_at": "2026-04-22 10:00:00"
   }
@@ -195,10 +200,12 @@
 ```json
 {
   "id": 15,
+  "requester_role": "student",
   "subject": "Проблема с загрузкой расписания",
   "status": "in_progress",
   "priority": "normal",
   "contact_name": "Иван Иванов",
+  "contact_email": "ivan@example.com",
   "created_at": "2026-04-22 12:00:00",
   "updated_at": "2026-04-22 14:30:00",
   "status_history": [
@@ -266,6 +273,19 @@
 ```
 
 Если `comment` пустой, сервер возвращает `400` с ошибкой `comment is required`.
+
+---
+
+### DELETE `/api/unified-window/tickets/{token}`
+
+Удалить обращение пользователем.
+
+Ограничение: удалять можно только обращения в статусе `closed`.
+
+```json
+// Response
+{ "ok": true }
+```
 
 ---
 
@@ -421,6 +441,50 @@
 **Response 200:** `{ "valid": true, "user": { "uid": 1, "username": "admin" }, "permissions": ["news:read", "news:write"] }`
 
 Ошибки возвращаются в формате `{ "code": "ADM-AUTH-00X", "error": "..." }`.
+
+---
+
+### GET `/adminapi/dashboard/summary`
+
+Ролевая сводка для дашборда. Возвращает разные блоки аналитики в зависимости от роли текущего пользователя.
+
+```json
+{
+  "role": "manager",
+  "roleSummary": {
+    "kind": "manager",
+    "schedule": {
+      "filledWeeks": 18,
+      "courses": 4,
+      "groupsByCourse": [
+        { "course": 1, "count": 6 },
+        { "course": 2, "count": 8 }
+      ],
+      "lastScheduleUpdate": "23.04.2026 14:55:10",
+      "filledToDate": "2026-06-30"
+    },
+    "news": {
+      "total": 42,
+      "publishedLast30Days": 9,
+      "avgPerWeekLast8Weeks": 1.13,
+      "lastPublishedAt": "2026-04-22 10:00:00"
+    },
+    "unifiedWindow": {
+      "total": 27,
+      "byStatus": { "open": 8, "in_progress": 6, "resolved": 4, "closed": 9 },
+      "unanswered": 5,
+      "unreadForAgent": 3
+    },
+    "freshness": {
+      "scheduleLastUpdate": "23.04.2026 14:55:10",
+      "scheduleFilledToDate": "2026-06-30",
+      "newsLastPublishedAt": "2026-04-22 10:00:00",
+      "unifiedWindowLastActivityAt": "2026-04-23 12:30:00"
+    }
+  },
+  "generatedAt": "2026-04-23 15:01:22"
+}
+```
 
 ---
 
@@ -780,11 +844,20 @@ CRUD для расписания звонков. Body — массив:
 
 **Query-параметры:** `status`, `role`, `limit` (по умолчанию `100`, максимум `500`)
 
+Каждый элемент списка включает:
+
+- `id`, `subject`, `status`, `priority`, `requester_role`, `contact_name`, `contact_email`
+- `last_message_author_role` (`user` или `agent`)
+- `last_message_at`
+- `has_unread_for_agent` (есть непрочитанный ответ пользователя для агента)
+
 ---
 
 ### GET `/adminapi/unified-window/tickets/{id}`
 
 Получить детали одного обращения, включая переписку, историю статусов и список вложений.
+
+При открытии обращения автоматически обновляется маркер чтения агента (`agent_last_read_at`).
 
 ---
 
@@ -822,6 +895,17 @@ CRUD для расписания звонков. Body — массив:
 ```
 
 `status`: `open` | `in_progress` | `resolved` | `closed`
+
+---
+
+### DELETE `/adminapi/unified-window/tickets/{id}`
+
+Полностью удалить обращение (агент/администратор).
+
+```json
+// Response
+{ "ok": true }
+```
 
 ---
 

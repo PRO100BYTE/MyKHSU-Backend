@@ -144,6 +144,149 @@ function buildAgentDisplayName(user) {
   return `${lastName}${initials ? ` ${initials}` : ''}`
 }
 
+function getLastScheduleDate() {
+  const row = pairsDb.prepare('SELECT MAX(date) AS max_date FROM pairs WHERE date IS NOT NULL AND TRIM(date) != ""').get()
+  return row?.max_date ?? null
+}
+
+function getLastScheduleUpdate() {
+  const settingsPath = path.resolve(process.cwd(), 'settings.json')
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+    return settings?.last_update ?? null
+  } catch {
+    return null
+  }
+}
+
+function getUnifiedWindowOverview() {
+  const byStatus = usersDb.prepare(
+    `SELECT status, COUNT(*) AS count
+     FROM unified_window_tickets
+     GROUP BY status`
+  ).all()
+
+  const countsByStatus = byStatus.reduce((acc, row) => {
+    acc[row.status] = Number(row.count || 0)
+    return acc
+  }, { open: 0, in_progress: 0, resolved: 0, closed: 0 })
+
+  const unansweredRow = usersDb.prepare(
+    `SELECT COUNT(*) AS count
+     FROM unified_window_tickets t
+     WHERE t.status IN ('open', 'in_progress')
+       AND (
+         SELECT m.author_role
+         FROM unified_window_messages m
+         WHERE m.ticket_id = t.id
+         ORDER BY m.created_at DESC, m.id DESC
+         LIMIT 1
+       ) = 'user'`
+  ).get()
+
+  const unreadForAgentRow = usersDb.prepare(
+    `SELECT COUNT(*) AS count
+     FROM unified_window_tickets t
+     WHERE (
+       SELECT m.author_role
+       FROM unified_window_messages m
+       WHERE m.ticket_id = t.id
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT 1
+     ) = 'user'
+     AND (
+       SELECT m.created_at
+       FROM unified_window_messages m
+       WHERE m.ticket_id = t.id
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT 1
+     ) > COALESCE(t.agent_last_read_at, '')`
+  ).get()
+
+  return {
+    total: Object.values(countsByStatus).reduce((sum, value) => sum + Number(value || 0), 0),
+    byStatus: countsByStatus,
+    unanswered: Number(unansweredRow?.count || 0),
+    unreadForAgent: Number(unreadForAgentRow?.count || 0),
+  }
+}
+
+function getNewsOverview() {
+  const nowIso = nowSql()
+  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  const eightWeeksAgoIso = new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+
+  const totalRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM news').get()
+  const monthRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM news WHERE date >= ?').get(monthAgoIso)
+  const eightWeeksRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM news WHERE date >= ?').get(eightWeeksAgoIso)
+  const lastNews = pairsDb.prepare('SELECT date FROM news ORDER BY date DESC LIMIT 1').get()
+
+  return {
+    total: Number(totalRow?.count || 0),
+    publishedLast30Days: Number(monthRow?.count || 0),
+    avgPerWeekLast8Weeks: Number(((Number(eightWeeksRow?.count || 0)) / 8).toFixed(2)),
+    lastPublishedAt: lastNews?.date ?? null,
+    generatedAt: nowIso,
+  }
+}
+
+function getScheduleOverview() {
+  const weeksRow = pairsDb.prepare('SELECT COUNT(DISTINCT week_number) AS count FROM pairs WHERE week_number IS NOT NULL').get()
+  const coursesRow = pairsDb.prepare('SELECT COUNT(*) AS count FROM course_catalog').get()
+  const groupsByCourse = pairsDb.prepare(
+    `SELECT course, COUNT(*) AS count
+     FROM group_catalog
+     GROUP BY course
+     ORDER BY course`
+  ).all()
+
+  return {
+    filledWeeks: Number(weeksRow?.count || 0),
+    courses: Number(coursesRow?.count || 0),
+    groupsByCourse: groupsByCourse.map(row => ({ course: row.course, count: Number(row.count || 0) })),
+    lastScheduleUpdate: getLastScheduleUpdate(),
+    filledToDate: getLastScheduleDate(),
+  }
+}
+
+function getUsersOverview() {
+  const total = usersDb.prepare('SELECT COUNT(*) AS count FROM users').get()
+  const active = usersDb.prepare('SELECT COUNT(*) AS count FROM users WHERE is_active = 1').get()
+  const byRole = usersDb.prepare(
+    `SELECT role, COUNT(*) AS count
+     FROM users
+     GROUP BY role
+     ORDER BY role`
+  ).all()
+  const recentChanges = usersDb.prepare(
+    `SELECT id, username, role, is_active, updated_at
+     FROM users
+     ORDER BY updated_at DESC
+     LIMIT 10`
+  ).all()
+
+  return {
+    total: Number(total?.count || 0),
+    active: Number(active?.count || 0),
+    disabled: Number(total?.count || 0) - Number(active?.count || 0),
+    byRole: byRole.map(row => ({ role: row.role ?? 'admin', count: Number(row.count || 0) })),
+    recentChanges,
+  }
+}
+
+function getSectionFreshness() {
+  const news = getNewsOverview()
+  const schedule = getScheduleOverview()
+  const uwLastMessage = usersDb.prepare('SELECT MAX(created_at) AS last_message_at FROM unified_window_messages').get()
+
+  return {
+    scheduleLastUpdate: schedule.lastScheduleUpdate,
+    scheduleFilledToDate: schedule.filledToDate,
+    newsLastPublishedAt: news.lastPublishedAt,
+    unifiedWindowLastActivityAt: uwLastMessage?.last_message_at ?? null,
+  }
+}
+
 const WEEKDAY_NAME_TO_NUM = {
   'понедельник': 1,
   'вторник': 2,
@@ -260,6 +403,61 @@ router.post('/checktoken', requireAuth, (req, res) => {
     ].filter(perm => hasPermission(req.user.role, perm))
   });
 });
+
+// ---------------------------------------------------------------------------
+// GET /adminapi/dashboard/summary
+// ---------------------------------------------------------------------------
+router.get('/dashboard/summary', requireAuth, (req, res) => {
+  const role = req.user?.role ?? USER_ROLES.ADMIN
+
+  const uw = getUnifiedWindowOverview()
+  const news = getNewsOverview()
+  const schedule = getScheduleOverview()
+  const users = getUsersOverview()
+  const freshness = getSectionFreshness()
+
+  let roleSummary = {}
+
+  if (role === USER_ROLES.UNIFIED_WINDOW_AGENT) {
+    roleSummary = {
+      kind: 'unified_window_agent',
+      unifiedWindow: uw,
+    }
+  } else if (role === USER_ROLES.NEWS_EDITOR) {
+    roleSummary = {
+      kind: 'news_editor',
+      news,
+    }
+  } else if (role === USER_ROLES.SCHEDULE_DISPATCHER) {
+    roleSummary = {
+      kind: 'schedule_dispatcher',
+      schedule,
+    }
+  } else if (role === USER_ROLES.MANAGER) {
+    roleSummary = {
+      kind: 'manager',
+      schedule,
+      news,
+      unifiedWindow: uw,
+      freshness,
+    }
+  } else {
+    roleSummary = {
+      kind: 'admin',
+      schedule,
+      news,
+      unifiedWindow: uw,
+      users,
+      freshness,
+    }
+  }
+
+  res.json({
+    role,
+    roleSummary,
+    generatedAt: nowSql(),
+  })
+})
 
 // ---------------------------------------------------------------------------
 // GET /adminapi/profile

@@ -12,6 +12,7 @@ import UsersScreen from './screens/UsersScreen';
 import AppearanceScreen from './screens/AppearanceScreen';
 import UnifiedWindowScreen from './screens/UnifiedWindowScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SystemInfoScreen from './screens/SystemInfoScreen';
 import BrandMark from './components/BrandMark';
 import { ADMIN_UI } from './constants';
 
@@ -83,6 +84,7 @@ export default function App() {
     '/users':     'Пользователи',
     '/unified-window': 'Единое окно',
     '/appearance': 'Внешний вид',
+    '/system-info': 'Информация о системе',
   };
   const title = TITLES[currentPath] ?? 'Панель администратора';
 
@@ -145,6 +147,10 @@ export default function App() {
                 <ion-icon name="color-palette-outline" />
                 Внешний вид
               </NavLink>
+              <NavLink to="/system-info" className="profile-menu__item">
+                <ion-icon name="information-circle-outline" />
+                Информация о системе
+              </NavLink>
               <LogoutButton menu />
             </div>
           </div>
@@ -172,6 +178,7 @@ export default function App() {
             <Route path="/unified-window" element={<ProtectedRoute requiredPerms={['unified_window:write']}><UnifiedWindowScreen /></ProtectedRoute>} />
             <Route path="/appearance" element={<AppearanceScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
+            <Route path="/system-info" element={<SystemInfoScreen />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>

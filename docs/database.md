@@ -91,6 +91,7 @@
 | Колонка | Тип | Описание |
 |---|---|---|
 | `id` | INTEGER PK AUTOINCREMENT | Идентификатор обращения |
+| `requester_role` | TEXT NOT NULL DEFAULT `visitor` | Тип заявителя (`visitor`, `student`, `teacher`) |
 | `subject` | TEXT NOT NULL | Тема обращения (fallback для старых записей) |
 | `contact_email` | TEXT | Email обращения (fallback для старых записей) |
 | `contact_name` | TEXT | Имя обращения (fallback для старых записей) |
@@ -104,6 +105,8 @@
 | `due_at` | TEXT | SLA-дедлайн |
 | `first_response_at` | TEXT | Время первого ответа агента |
 | `resolved_at` | TEXT | Время решения |
+| `user_last_read_at` | TEXT | Время, когда пользователь в последний раз открыл переписку |
+| `agent_last_read_at` | TEXT | Время, когда агент в последний раз открыл переписку |
 | `created_at` | TEXT NOT NULL | Дата создания |
 | `updated_at` | TEXT NOT NULL | Дата последнего изменения |
 

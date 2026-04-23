@@ -830,6 +830,53 @@ html, body, #root {
   color: var(--text);
 }
 
+.dashboard-bars {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-bars__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.dashboard-bars__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr 48px;
+  gap: 10px;
+  align-items: center;
+}
+
+.dashboard-bars__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dashboard-bars__track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-secondary);
+  overflow: hidden;
+  border: 0.5px solid var(--border-strong);
+}
+
+.dashboard-bars__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+}
+
+.dashboard-bars__value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+}
+
 .preview-surface {
   padding: 16px;
   border-radius: 18px;
