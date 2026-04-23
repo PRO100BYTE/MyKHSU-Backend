@@ -10,6 +10,7 @@ import { getWeekDates, normalizeDate } from '../utils/dates.js';
 import { hasPermission, USER_ROLES } from '../utils/permissions.js';
 import { encryptText, decryptText, encryptBuffer, decryptBuffer } from '../utils/uw-crypto.js';
 import { sendUnifiedWindowEmail } from '../utils/uw-notify.js';
+import { logUserLogin } from '../utils/login-logger.js';
 import {
   nowKrasnoyarskSql,
   plusHoursKrasnoyarskSql,
