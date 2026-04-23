@@ -714,6 +714,28 @@
 
 ---
 
+### PATCH `/adminapi/catalog/groups/{id}`
+
+Обновить группу каталога (переименование и/или перенос в другой курс).
+
+```json
+// Request
+{ "course": 2, "group_name": "ИТ-22" }
+
+// Response
+{ "ok": true }
+```
+
+---
+
+### DELETE `/adminapi/catalog/groups/{id}`
+
+Удалить группу из каталога.
+
+**Response:** `{ "ok": true }`
+
+---
+
 ### DELETE `/adminapi/deletetable`
 
 Удалить все записи из таблицы `pairs`.
