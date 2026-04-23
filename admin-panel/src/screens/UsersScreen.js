@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 const EMPTY_FORM = {
   username: '',
@@ -49,6 +50,7 @@ const ROLE_PERMISSIONS = {
 export default function UsersScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { confirm } = useConfirmDialog();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -172,7 +174,13 @@ export default function UsersScreen() {
   }
 
   async function removeUser(target) {
-    if (!window.confirm(`Удалить пользователя "${target.username}"?`)) return;
+    const accepted = await confirm({
+      title: 'Удаление пользователя',
+      message: `Удалить пользователя "${target.username}"? Действие необратимо.`,
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
 
     setSaving(true);
     const res = await api.deleteUser(target.id);

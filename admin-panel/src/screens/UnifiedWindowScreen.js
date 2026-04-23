@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import { useToast } from '../context/ToastContext'
+import { useConfirmDialog } from '../context/ConfirmDialogContext'
 
 const STATUSES = [
   { value: '', label: 'Все статусы' },
@@ -42,6 +43,7 @@ function getMessageAuthor(message) {
 
 export default function UnifiedWindowScreen() {
   const { showToast } = useToast()
+  const { confirm } = useConfirmDialog()
   const [statusFilter, setStatusFilter] = useState('')
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
@@ -182,7 +184,12 @@ export default function UnifiedWindowScreen() {
 
   const deleteTicket = async () => {
     if (!selected) return
-    const confirmed = window.confirm(`Удалить обращение #${selected.id}? Действие необратимо.`)
+    const confirmed = await confirm({
+      title: 'Удаление обращения',
+      message: `Удалить обращение #${selected.id}? Действие необратимо.`,
+      confirmText: 'Удалить',
+      danger: true,
+    })
     if (!confirmed) return
 
     setSaving(true)

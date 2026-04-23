@@ -6,11 +6,9 @@ export default function AppearanceScreen() {
   const {
     theme,
     accentColor,
-    showNavLabels,
     uiDensity,
     setTheme,
     setAccentColor,
-    setShowNavLabels,
     setUiDensity,
   } = useTheme();
 
@@ -114,18 +112,6 @@ export default function AppearanceScreen() {
           </div>
         </div>
         <div className="card__body appearance-controls">
-          <label className="switch-row">
-            <span>
-              <strong>Показывать подписи меню</strong>
-              <small>Если отключить, в сайдбаре останутся только иконки</small>
-            </span>
-            <input
-              type="checkbox"
-              checked={showNavLabels}
-              onChange={(event) => setShowNavLabels(event.target.checked)}
-            />
-          </label>
-
           <div className="density-group">
             <div className="density-group__title">Плотность интерфейса</div>
             <div className="density-group__controls">

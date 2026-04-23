@@ -10,9 +10,6 @@ export function ThemeProvider({ children }) {
   const [accentColor, setAccentColor] = useState(() =>
     localStorage.getItem('admin_accent') ?? 'green'
   );
-  const [showNavLabels, setShowNavLabels] = useState(() =>
-    localStorage.getItem('admin_nav_labels') !== 'false'
-  );
   const [uiDensity, setUiDensity] = useState(() =>
     localStorage.getItem('admin_ui_density') ?? 'comfortable'
   );
@@ -23,13 +20,11 @@ export function ThemeProvider({ children }) {
 
     document.documentElement.setAttribute('data-theme', safeTheme);
     document.documentElement.setAttribute('data-accent', safeAccent);
-    document.documentElement.setAttribute('data-nav-labels', showNavLabels ? 'on' : 'off');
     document.documentElement.setAttribute('data-density', uiDensity === 'compact' ? 'compact' : 'comfortable');
     localStorage.setItem('admin_theme', theme);
     localStorage.setItem('admin_accent', accentColor);
-    localStorage.setItem('admin_nav_labels', String(showNavLabels));
     localStorage.setItem('admin_ui_density', uiDensity === 'compact' ? 'compact' : 'comfortable');
-  }, [theme, accentColor, showNavLabels, uiDensity]);
+  }, [theme, accentColor, uiDensity]);
 
   const toggle = () => {
     const order = ['dark', 'light', 'matrix', 'legend'];
@@ -52,10 +47,6 @@ export function ThemeProvider({ children }) {
     setAccentColor(nextAccent);
   };
 
-  const setNavLabelsVisibility = (value) => {
-    setShowNavLabels(Boolean(value));
-  };
-
   const setDensity = (value) => {
     setUiDensity(value === 'compact' ? 'compact' : 'comfortable');
   };
@@ -65,12 +56,10 @@ export function ThemeProvider({ children }) {
       value={{
         theme,
         accentColor,
-        showNavLabels,
         uiDensity,
         toggle,
         setTheme: selectTheme,
         setAccentColor: selectAccentColor,
-        setShowNavLabels: setNavLabelsVisibility,
         setUiDensity: setDensity,
       }}
     >

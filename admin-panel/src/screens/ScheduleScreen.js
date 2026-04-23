@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
 import { useToast } from '../context/ToastContext';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
@@ -56,6 +57,7 @@ export default function ScheduleScreen() {
 
 function ManualTab() {
   const { showToast } = useToast();
+  const { confirm } = useConfirmDialog();
   const [course, setCourse] = useState('1');
   const [group, setGroup] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
@@ -457,7 +459,13 @@ function EditTab() {
   };
 
   const deletePair = async (pairId) => {
-    if (!window.confirm('Вы уверены?')) return;
+    const accepted = await confirm({
+      title: 'Удаление пары',
+      message: 'Вы уверены, что хотите удалить эту пару?',
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
     setSaving(true);
     const resp = await api.deletePair(pairId);
     setSaving(false);

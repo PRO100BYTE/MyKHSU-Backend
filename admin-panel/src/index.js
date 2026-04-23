@@ -6,6 +6,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,9 +14,11 @@ root.render(
     <BrowserRouter basename="/admin-panel">
       <ThemeProvider>
         <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <ConfirmDialogProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ConfirmDialogProvider>
         </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>

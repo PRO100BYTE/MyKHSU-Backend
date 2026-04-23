@@ -27,7 +27,7 @@ const NAV_ITEMS = [
 
 export default function App() {
   const { user, loading, hasPermission } = useAuth();
-  const { showNavLabels, uiDensity } = useTheme();
+  const { uiDensity } = useTheme();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 768);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -112,10 +112,10 @@ export default function App() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => `sidebar__item${isActive ? ' active' : ''}`}
-              title={sidebarCollapsed || !showNavLabels ? item.label : undefined}
+              title={sidebarCollapsed ? item.label : undefined}
             >
               <ion-icon name={item.icon} />
-              {!sidebarCollapsed && showNavLabels ? <span className="sidebar__item-label">{item.label}</span> : null}
+              {!sidebarCollapsed ? <span className="sidebar__item-label">{item.label}</span> : null}
             </NavLink>
           ))}
         </nav>

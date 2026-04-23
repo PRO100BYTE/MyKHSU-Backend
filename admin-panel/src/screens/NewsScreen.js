@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
 import { useToast } from '../context/ToastContext';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 export default function NewsScreen() {
   const { showToast } = useToast();
+  const { confirm } = useConfirmDialog();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { mode: 'create'|'edit', item?: {...} }
@@ -35,7 +37,13 @@ export default function NewsScreen() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Удалить эту новость?')) return;
+    const accepted = await confirm({
+      title: 'Удалить новость',
+      message: 'Вы уверены, что хотите удалить эту новость?',
+      confirmText: 'Удалить',
+      danger: true,
+    });
+    if (!accepted) return;
     const res = await api.deleteNews(id);
     if (!res?.ok) {
       showToast({

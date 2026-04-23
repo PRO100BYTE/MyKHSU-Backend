@@ -45,8 +45,8 @@ export default function LoginScreen() {
     <div className="login-screen">
       <div className="login-card login-card--animated">
         <div className="login-logo">
-          <div className="login-logo__icon-wrap">
-            <BrandMark className="login-logo__icon" />
+          <div className="login-logo__icon-wrap sidebar__logo-wrap">
+            <BrandMark className="sidebar__logo" />
           </div>
           <div className="login-logo__title">{ADMIN_UI.brandTitle}</div>
           <div className="login-logo__sub">{ADMIN_UI.loginSubTitle}</div>

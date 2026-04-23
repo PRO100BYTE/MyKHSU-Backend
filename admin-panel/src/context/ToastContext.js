@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 const ToastContext = createContext(null)
+const TOAST_LEAVE_DURATION = 220
 
 function createToastId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -8,15 +9,38 @@ function createToastId() {
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
-  const timeoutRefs = useRef(new Map())
+  const autoDismissTimeoutsRef = useRef(new Map())
+  const removeTimeoutsRef = useRef(new Map())
+
+  useEffect(() => {
+    return () => {
+      autoDismissTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId))
+      removeTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId))
+      autoDismissTimeoutsRef.current.clear()
+      removeTimeoutsRef.current.clear()
+    }
+  }, [])
 
   const dismissToast = useCallback((toastId) => {
-    const timeoutId = timeoutRefs.current.get(toastId)
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-      timeoutRefs.current.delete(toastId)
+    const autoDismissTimeoutId = autoDismissTimeoutsRef.current.get(toastId)
+    if (autoDismissTimeoutId) {
+      clearTimeout(autoDismissTimeoutId)
+      autoDismissTimeoutsRef.current.delete(toastId)
     }
-    setToasts(current => current.filter(toast => toast.id !== toastId))
+
+    setToasts(current => {
+      const target = current.find(toast => toast.id === toastId)
+      if (!target || target.isLeaving) return current
+      return current.map(toast => (toast.id === toastId ? { ...toast, isLeaving: true } : toast))
+    })
+
+    if (!removeTimeoutsRef.current.has(toastId)) {
+      const removeTimeoutId = window.setTimeout(() => {
+        removeTimeoutsRef.current.delete(toastId)
+        setToasts(current => current.filter(toast => toast.id !== toastId))
+      }, TOAST_LEAVE_DURATION)
+      removeTimeoutsRef.current.set(toastId, removeTimeoutId)
+    }
   }, [])
 
   const showToast = useCallback((toast) => {
@@ -29,6 +53,7 @@ export function ToastProvider({ children }) {
       description: toast.description ?? '',
       code: toast.code ?? '',
       duration,
+      isLeaving: false,
     }
 
     setToasts(current => [...current, nextToast])
@@ -36,7 +61,7 @@ export function ToastProvider({ children }) {
     const timeoutId = window.setTimeout(() => {
       dismissToast(id)
     }, duration)
-    timeoutRefs.current.set(id, timeoutId)
+    autoDismissTimeoutsRef.current.set(id, timeoutId)
 
     return id
   }, [dismissToast])
@@ -48,7 +73,7 @@ export function ToastProvider({ children }) {
       {children}
       <div className="toast-stack" aria-live="polite" aria-atomic="true">
         {toasts.map(toast => (
-          <div key={toast.id} className={`toast toast--${toast.variant}`} role="status">
+          <div key={toast.id} className={`toast toast--${toast.variant}${toast.isLeaving ? ' toast--leaving' : ''}`} role="status">
             <div className="toast__icon" aria-hidden="true">
               <ion-icon
                 name={
