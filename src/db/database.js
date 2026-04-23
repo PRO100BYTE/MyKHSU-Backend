@@ -117,6 +117,24 @@ function initUsersSchema(db) {
       updated_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS login_history (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip_address      TEXT,
+      user_agent      TEXT,
+      device_model    TEXT,
+      device_os       TEXT,
+      device_os_version TEXT,
+      browser_name    TEXT,
+      browser_version TEXT,
+      login_timestamp TEXT NOT NULL,
+      created_at      TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_history_user_id      ON login_history(user_id);
+    CREATE INDEX IF NOT EXISTS idx_login_history_timestamp    ON login_history(login_timestamp);
+    CREATE INDEX IF NOT EXISTS idx_login_history_ip_address   ON login_history(ip_address);
+
     CREATE TABLE IF NOT EXISTS unified_window_tickets (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       requester_role   TEXT    NOT NULL DEFAULT 'visitor',
@@ -262,6 +280,24 @@ function initUsersSchema(db) {
     db.exec('ALTER TABLE unified_window_tickets ADD COLUMN agent_last_read_at TEXT');
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_uw_tickets_contact_email_hash ON unified_window_tickets(contact_email_hash)');
+
+  // Миграция для таблицы login_history
+  try {
+    const lhColumns = db.prepare('PRAGMA table_info(login_history)').all().map(c => c.name);
+    if (lhColumns.length === 0) {
+      // Таблица не существует - она создана в CREATE TABLE IF NOT EXISTS выше
+    } else {
+      if (!lhColumns.includes('device_os_version')) {
+        db.exec('ALTER TABLE login_history ADD COLUMN device_os_version TEXT');
+      }
+      if (!lhColumns.includes('browser_name')) {
+        db.exec('ALTER TABLE login_history ADD COLUMN browser_name TEXT');
+      }
+      if (!lhColumns.includes('browser_version')) {
+        db.exec('ALTER TABLE login_history ADD COLUMN browser_version TEXT');
+      }
+    }
+  } catch {}
 
   const now = nowKrasnoyarskSql();
   db.prepare('UPDATE users SET created_at = COALESCE(created_at, ?), updated_at = COALESCE(updated_at, ?)').run(now, now);
