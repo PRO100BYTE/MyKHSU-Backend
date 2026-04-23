@@ -171,7 +171,7 @@ function ManualTab() {
     setLoadingWeek(false)
 
     const rawSlots = Array.isArray(timesResp) ? timesResp : []
-    const rawPairs = Array.isArray(pairsResp) ? pairsResp : []
+    const rawPairs = pairsResp?.ok && Array.isArray(pairsResp.data) ? pairsResp.data : []
 
     if (!rawSlots.length) {
       showToast({
@@ -356,19 +356,31 @@ function ManualTab() {
       </div>
       <div className="card__body" style={{ display: 'grid', gap: 14 }}>
         <div className="table-wrap" style={{ padding: 12 }}>
-          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))' }}>
-            <select className="select" value={course} onChange={e => setCourse(e.target.value)}>
-              {!courses.length ? <option value="">Нет курсов</option> : null}
-              {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
-            </select>
-            <select className="select" value={group} onChange={e => setGroup(e.target.value)} style={{ width: '100%' }}>
-              {!groups.length ? <option value="">Нет групп</option> : null}
-              {groups.map(item => <option key={item} value={item}>{item}</option>)}
-            </select>
-            <input className="input" placeholder="Номер недели" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
+          <div className="schedule-manual-filters">
+            <label className="field schedule-manual-filter">
+              <span className="field__label">Курс</span>
+              <select className="select schedule-manual-filter__control" value={course} onChange={e => setCourse(e.target.value)}>
+                {!courses.length ? <option value="">Нет курсов</option> : null}
+                {courses.map(item => <option key={item} value={String(item)}>{item}</option>)}
+              </select>
+            </label>
+            <label className="field schedule-manual-filter">
+              <span className="field__label">Группа</span>
+              <select className="select schedule-manual-filter__control" value={group} onChange={e => setGroup(e.target.value)}>
+                {!groups.length ? <option value="">Нет групп</option> : null}
+                {groups.map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="field schedule-manual-filter">
+              <span className="field__label">Номер недели</span>
+              <input className="input schedule-manual-filter__control" placeholder="Например: 12" value={weekNumber} onChange={e => setWeekNumber(e.target.value)} />
+            </label>
           </div>
 
-          <input className="input" placeholder="Или введите группу вручную" value={group} onChange={e => setGroup(e.target.value)} style={{ marginTop: 10 }} />
+          <label className="field" style={{ marginTop: 10 }}>
+            <span className="field__label">Группа (ручной ввод)</span>
+            <input className="input schedule-manual-filter__control" placeholder="Если группы нет в списке — введите вручную" value={group} onChange={e => setGroup(e.target.value)} />
+          </label>
 
           <div className="table-wrap" style={{ marginTop: 12 }}>
             <table className="table">
