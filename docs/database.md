@@ -206,6 +206,8 @@
 
 Скрипт `scripts/build-frontend.js` теперь собирает единый frontend bundle (`web-build/` + `web-build/admin-panel/`) и использует `mykhsu-web/` (git submodule) как основной источник MyKHSU-web.
 
+Скрипт `scripts/sync-build-info.js` автоматически синхронизирует build-метаданные (версии из `src/constants.js`, git hash, дата сборки по `Asia/Krasnoyarsk`) перед сборкой backend/admin/web. Он не меняет структуру таблиц, но обновляет служебные файлы сборки (`src/build-info.generated.js`, `.env.production.local` для frontend-приложений).
+
 Это изменение **не меняет схему БД** (`pairs.sqlite`, `users.sqlite`), но влияет на путь доступа к UI, через который выполняются административные операции с данными.
 
 ---

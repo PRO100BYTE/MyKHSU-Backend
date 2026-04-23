@@ -23,7 +23,11 @@
   "api_version": "1.1.0",
   "app_version": "1.1.0",
   "build_number": "2026.04.22.1",
-  "build_date": "2026-04-22T00:00:00.000Z",
+  "build_date": "2026-04-23T15:01:22+07:00",
+  "build_date_human": "23.04.2026, 15:01:22",
+  "git_commit_hash": "9e2798a",
+  "build_timezone": "Asia/Krasnoyarsk",
+  "build_timezone_label": "Asia/Krasnoyarsk (GMT+7)",
   "admin_panel_version": "1.1.0",
   "frontend_version": "1.1.0",
   "contacts": {
@@ -480,6 +484,33 @@
       "scheduleFilledToDate": "2026-06-30",
       "newsLastPublishedAt": "2026-04-22 10:00:00",
       "unifiedWindowLastActivityAt": "2026-04-23 12:30:00"
+    }
+  },
+  "system": {
+    "timezone": "Asia/Krasnoyarsk (GMT+7)",
+    "generatedAt": "2026-04-23 15:01:22",
+    "generatedAtHuman": "23.04.2026, 15:01:22",
+    "runtime": {
+      "nodeVersion": "v20.19.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "pid": 12345,
+      "uptimeSeconds": 378,
+      "memoryMb": {
+        "rss": 93.48,
+        "heapUsed": 24.16,
+        "heapTotal": 38.51
+      }
+    },
+    "entities": {
+      "pairs": 5821,
+      "times": 11,
+      "news": 42,
+      "users": 7,
+      "unifiedWindowTickets": 27,
+      "unifiedWindowMessages": 146,
+      "unifiedWindowFiles": 4,
+      "unifiedWindowStatusHistory": 35
     }
   },
   "generatedAt": "2026-04-23 15:01:22"
