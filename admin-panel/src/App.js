@@ -31,13 +31,22 @@ export default function App() {
   const { user, loading, hasPermission } = useAuth();
   const { uiDensity } = useTheme();
   const location = useLocation();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 768);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
-  // Auto-collapse sidebar on small screens
+  // Responsive layout mode + sidebar behavior
   useEffect(() => {
-    const onResize = () => setSidebarCollapsed(window.innerWidth <= 768);
+    const onResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -58,6 +67,12 @@ export default function App() {
   useEffect(() => {
     setProfileMenuOpen(false);
   }, [location.pathname, sidebarCollapsed]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [location.pathname, isMobile]);
 
   if (loading) {
     return (
@@ -97,8 +112,17 @@ export default function App() {
       <div className="admin-layout__glow admin-layout__glow--secondary" />
       <div className="admin-layout__noise" />
 
+      {!sidebarCollapsed && isMobile ? (
+        <button
+          type="button"
+          className="admin-layout__backdrop"
+          aria-label="Закрыть меню"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      ) : null}
+
       {/* Sidebar */}
-      <aside className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}>
+      <aside className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}${isMobile && !sidebarCollapsed ? ' sidebar--mobile-open' : ''}`}>
         <div className="sidebar__brand">
           <div className="sidebar__logo-wrap">
             <BrandMark className="sidebar__logo" />
@@ -116,6 +140,7 @@ export default function App() {
               to={item.to}
               className={({ isActive }) => `sidebar__item${isActive ? ' active' : ''}`}
               title={sidebarCollapsed ? item.label : undefined}
+              onClick={isMobile ? () => setSidebarCollapsed(true) : undefined}
             >
               <ion-icon name={item.icon} />
               {!sidebarCollapsed ? <span className="sidebar__item-label">{item.label}</span> : null}
@@ -166,6 +191,16 @@ export default function App() {
           <div className="admin-header__title-wrap">
             <div className="admin-header__eyebrow">Control Center</div>
             <div className="admin-header__title">{title}</div>
+          </div>
+          <div className="admin-header__actions">
+            <button
+              type="button"
+              className="btn-icon admin-header__menu-btn"
+              aria-label="Открыть меню"
+              onClick={toggleSidebar}
+            >
+              <ion-icon name={sidebarCollapsed ? 'menu-outline' : 'close-outline'} />
+            </button>
           </div>
         </header>
 
