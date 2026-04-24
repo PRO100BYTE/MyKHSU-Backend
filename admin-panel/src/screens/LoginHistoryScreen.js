@@ -14,7 +14,6 @@ export default function LoginHistoryScreen() {
   const [pagination, setPagination] = useState({ total: 0, limit: 100, offset: 0, pages: 0 });
   const [filter, setFilter] = useState({
     userId: '',
-    username: '',
   });
   const [sortBy, setSortBy] = useState('date_desc');
 
@@ -70,26 +69,26 @@ export default function LoginHistoryScreen() {
   };
 
   return (
-    <div className="admin-screen">
-      {/* Header */}
-      <div className="admin-header">
-        <div className="admin-header__title">
-          <ion-icon name="log-in-outline" className="admin-header__icon" />
-          История входов
+    <div className="screen-stack login-history-screen">
+      <div className="screen-hero">
+        <div className="screen-hero__icon">
+          <ion-icon name="log-in-outline" />
         </div>
-        <div className="admin-header__subtitle">
-          Все входы в админку
+        <div>
+          <div className="screen-hero__title">История входов</div>
+          <div className="screen-hero__sub">Все попытки входа в админ-панель с деталями устройства и сети</div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card login-history-filters-card">
         <div className="card__header">
-          <ion-icon name="filter-outline" />
-          Фильтры
+          <div>
+            <div className="card__title">Фильтры</div>
+            <div className="card__subtitle">Поиск и сортировка по журналу входов</div>
+          </div>
         </div>
         <div className="card__body">
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <div className="form-grid login-history-filters-grid">
             <label className="field">
               <span className="field__label">ID пользователя (опционально)</span>
               <input
@@ -115,28 +114,36 @@ export default function LoginHistoryScreen() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="card">
+        <div className="card__header">
+          <div>
+            <div className="card__title">Журнал входов</div>
+            <div className="card__subtitle">
+              Всего записей: {pagination.total}
+            </div>
+          </div>
+        </div>
         {error && (
-          <div className="alert alert-error">
+          <div className="alert alert-error login-history-alert">
             <ion-icon name="alert-circle-outline" />
             {error}
           </div>
         )}
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+          <div className="empty-state">
             <span className="spinner spinner-lg" />
           </div>
         ) : history.length === 0 ? (
           <div className="empty-state">
-            <ion-icon name="calendar-outline" />
-            <div>Нет записей о входах</div>
+            <ion-icon name="log-in-outline" />
+            <div className="empty-state__title">История входов пуста</div>
+            <div className="empty-state__description">Появится после первой успешной авторизации</div>
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table">
+            <div className="table-wrap login-history-table-wrap">
+              <table>
                 <thead>
                   <tr>
                     <th>Дата и время</th>
@@ -152,32 +159,35 @@ export default function LoginHistoryScreen() {
                     const timestamp = new Date(entry.login_timestamp);
                     const dateStr = timestamp.toLocaleDateString('ru-RU');
                     const timeStr = timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const fullName = [entry.last_name, entry.first_name].filter(Boolean).join(' ');
 
                     return (
                       <tr key={idx}>
-                        <td className="table__cell">{dateStr} {timeStr}</td>
-                        <td className="table__cell">
-                          <div>
-                            <div className="table__text-strong">{entry.username}</div>
+                        <td className="table-cell-muted">{dateStr} {timeStr}</td>
+                        <td>
+                          <div className="login-history-user-cell">
+                            <div className="table-cell-strong">{entry.username || '—'}</div>
                             {entry.first_name && (
-                              <div className="table__text-secondary">
-                                {entry.last_name && entry.first_name ? `${entry.last_name} ${entry.first_name}` : entry.first_name}
+                              <div className="table-cell-muted table-cell-muted--weak">
+                                {fullName || entry.first_name}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="table__cell table__text-code">{entry.ip_address || '—'}</td>
-                        <td className="table__cell">
-                          <span className="badge badge-info">
-                            {entry.device_os}{entry.device_os_version ? ` ${entry.device_os_version}` : ''}
+                        <td>
+                          <span className="login-history-code">{entry.ip_address || '—'}</span>
+                        </td>
+                        <td>
+                          <span className="badge badge-gray">
+                            {entry.device_os ? `${entry.device_os}${entry.device_os_version ? ` ${entry.device_os_version}` : ''}` : '—'}
                           </span>
                         </td>
-                        <td className="table__cell">
-                          <span className="badge badge-info">
-                            {entry.browser_name}{entry.browser_version ? ` ${entry.browser_version}` : ''}
+                        <td>
+                          <span className="badge badge-gray">
+                            {entry.browser_name ? `${entry.browser_name}${entry.browser_version ? ` ${entry.browser_version}` : ''}` : '—'}
                           </span>
                         </td>
-                        <td className="table__cell">{entry.device_model || '—'}</td>
+                        <td className="table-cell-muted">{entry.device_model || '—'}</td>
                       </tr>
                     );
                   })}
@@ -185,14 +195,13 @@ export default function LoginHistoryScreen() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="table-pagination">
-              <div className="table-pagination__info">
+            <div className="login-history-pagination">
+              <div className="login-history-pagination__info">
                 Всего: {pagination.total} • Страница {Math.floor(pagination.offset / pagination.limit) + 1} из {pagination.pages || 1}
               </div>
-              <div className="table-pagination__controls">
+              <div className="login-history-pagination__controls">
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-ghost"
                   onClick={handlePrevPage}
                   disabled={pagination.offset === 0}
                 >
@@ -200,7 +209,7 @@ export default function LoginHistoryScreen() {
                   Предыдущая
                 </button>
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-ghost"
                   onClick={handleNextPage}
                   disabled={pagination.offset + pagination.limit >= pagination.total}
                 >

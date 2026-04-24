@@ -2333,6 +2333,85 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   font-size: 14px;
 }
 
+.login-history-screen {
+  padding-bottom: 8px;
+}
+
+.login-history-filters-card {
+  margin-top: 2px;
+}
+
+.login-history-filters-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.login-history-alert {
+  margin: 16px 22px 0;
+}
+
+.login-history-table-wrap {
+  padding: 0 14px 10px;
+}
+
+.login-history-user-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.login-history-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 8px;
+  display: inline-flex;
+}
+
+.login-history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 0.5px solid var(--border);
+  padding: 14px 22px 18px;
+}
+
+.login-history-pagination__info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.login-history-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .login-history-table-wrap {
+    padding: 0 8px 10px;
+  }
+
+  .login-history-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px 16px;
+  }
+
+  .login-history-pagination__controls {
+    justify-content: space-between;
+  }
+
+  .login-history-pagination__controls .btn {
+    flex: 1;
+  }
+}
+
 /* ===== Animations ===== */
 @keyframes fadeIn {
   from { opacity: 0; }
