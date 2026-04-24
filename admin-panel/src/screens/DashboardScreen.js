@@ -3,6 +3,8 @@ import api from '../api'
 import { useAuth } from '../context/AuthContext'
 import { formatDateTimeKrasnoyarsk } from '../utils/datetime'
 
+const DASHBOARD_SNAP_HINT_KEY = 'admin_dashboard_snap_hint_seen_v1'
+
 const ROLE_LABELS = {
   admin: 'Администратор',
   manager: 'Менеджер',
@@ -26,6 +28,8 @@ export default function DashboardScreen() {
   const { hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState(null)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
+  const [showSnapHint, setShowSnapHint] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -40,6 +44,37 @@ export default function DashboardScreen() {
     load()
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768)
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setShowSnapHint(false)
+      return
+    }
+
+    const seen = window.localStorage.getItem(DASHBOARD_SNAP_HINT_KEY) === '1'
+    setShowSnapHint(!seen)
+  }, [isMobile])
+
+  function dismissSnapHint() {
+    setShowSnapHint(false)
+    try {
+      window.localStorage.setItem(DASHBOARD_SNAP_HINT_KEY, '1')
+    } catch {}
+  }
+
+  function handleStatsRailScroll(event) {
+    if (!showSnapHint) return
+    if (event.currentTarget.scrollLeft > 8) {
+      dismissSnapHint()
+    }
+  }
 
   const quickActions = useMemo(() => {
     return [
@@ -83,6 +118,18 @@ export default function DashboardScreen() {
         </div>
       </div>
 
+      {showSnapHint ? (
+        <div className="dashboard-snap-hint" role="status" aria-live="polite">
+          <div className="dashboard-snap-hint__text">
+            <ion-icon name="swap-horizontal-outline" />
+            Потяни карточки статистики вбок
+          </div>
+          <button type="button" className="btn-icon" aria-label="Закрыть подсказку" onClick={dismissSnapHint}>
+            <ion-icon name="close-outline" />
+          </button>
+        </div>
+      ) : null}
+
       <div className="card">
         <div className="card__header">
           <div>
@@ -115,7 +162,7 @@ export default function DashboardScreen() {
             </div>
           </div>
           <div className="card__body">
-            <div className="stats-grid">
+            <div className="stats-grid" onScroll={handleStatsRailScroll}>
               <StatCard icon="mail-outline" value={unifiedWindow.total} label="Всего обращений" />
               <StatCard icon="chatbubbles-outline" value={unifiedWindow.unanswered} label="Неотвеченные" />
               <StatCard icon="notifications-outline" value={unifiedWindow.unreadForAgent} label="Непрочитанные для агента" />
@@ -140,7 +187,7 @@ export default function DashboardScreen() {
             </div>
           </div>
           <div className="card__body">
-            <div className="stats-grid">
+            <div className="stats-grid" onScroll={handleStatsRailScroll}>
               <StatCard icon="newspaper-outline" value={news.total} label="Всего новостей" />
               <StatCard icon="sparkles-outline" value={news.publishedLast30Days} label="За 30 дней" />
               <StatCard icon="speedometer-outline" value={news.avgPerWeekLast8Weeks} label="В среднем в неделю" />
@@ -159,7 +206,7 @@ export default function DashboardScreen() {
             </div>
           </div>
           <div className="card__body">
-            <div className="stats-grid">
+            <div className="stats-grid" onScroll={handleStatsRailScroll}>
               <StatCard icon="calendar-outline" value={schedule.filledWeeks} label="Заполненных недель" />
               <StatCard icon="school-outline" value={schedule.courses} label="Добавленных курсов" />
               <StatCard icon="refresh-outline" value={schedule.lastScheduleUpdate || '—'} label="Последнее обновление" small />
@@ -185,7 +232,7 @@ export default function DashboardScreen() {
             </div>
           </div>
           <div className="card__body">
-            <div className="stats-grid">
+            <div className="stats-grid" onScroll={handleStatsRailScroll}>
               <StatCard icon="people-outline" value={users.total} label="Пользователей всего" />
               <StatCard icon="checkmark-circle-outline" value={users.active} label="Активных" />
               <StatCard icon="pause-circle-outline" value={users.disabled} label="Отключенных" />
