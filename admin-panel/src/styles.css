@@ -2757,8 +2757,4 @@ tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
   .admin-content {
     padding-right: 18px;
   }
-
-  .screen-stack {
-    max-width: 1400px;
-  }
 }
